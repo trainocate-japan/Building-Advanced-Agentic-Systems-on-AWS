@@ -1,0 +1,8 @@
+{"input": "注文 ORD-12345 の配送状況を教えてください", "expected_output": "注文の配送状況を確認し、具体的な配送日と追跡番号を提供する", "category": "order_inquiry", "complexity": "simple"}
+{"input": "先月の請求が二重になっている気がします。確認して返金してください。", "expected_output": "請求履歴を確認し、二重請求があれば返金処理を案内する。金額と処理期間を明示する。", "category": "billing_dispute", "complexity": "medium"}
+{"input": "APIのレート制限に頻繁に引っかかります。エンタープライズプランへのアップグレードを検討していますが、コストパフォーマンスを比較してください。", "expected_output": "現在のプランのレート制限を説明し、エンタープライズプランの特徴とコストを比較。ROI の観点から推奨を提示する。", "category": "plan_upgrade", "complexity": "complex"}
+{"input": "機密データの取り扱いポリシーについて教えてください。GDPRに準拠していますか？", "expected_output": "データ保護ポリシーの概要を説明し、GDPR 準拠状況を明確に回答する。具体的な保護措置を列挙する。", "category": "compliance", "complexity": "complex"}
+{"input": "こんにちは", "expected_output": "丁寧な挨拶と、どのようなサポートが可能かを案内する", "category": "greeting", "complexity": "simple"}
+{"input": "パスワードをリセットしたいのですが、登録メールアドレスにアクセスできません。", "expected_output": "本人確認の代替手段を案内し、セキュリティを保ちながらパスワードリセットの手順を説明する。", "category": "account_recovery", "complexity": "medium"}
+{"input": "御社のサービスで障害が発生していませんか？午前10時頃からAPIが不安定です。", "expected_output": "システムステータスを確認し、既知の障害があれば状況と復旧見込みを伝える。なければトラブルシューティング手順を案内する。", "category": "incident_report", "complexity": "medium"}
+{"input": "解約したいです。", "expected_output": "解約理由のヒアリングと解約手続きの案内。リテンション施策の提案（無理な引き留めはしない）。", "category": "cancellation", "complexity": "medium"}

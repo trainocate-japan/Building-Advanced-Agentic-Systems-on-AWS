@@ -1,0 +1,339 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "Building Advanced Agentic Systems on AWS - Hands-on Demo EC2 (Session Manager, Auto-Stop)"
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.small, t3.medium, t3.large]
+    Description: EC2 インスタンスタイプ
+
+  AssetsBucket:
+    Type: String
+    Description: ハンズオン資材がアップロードされた S3 バケット名
+
+  AssetsPrefix:
+    Type: String
+    Default: handson-assets
+    Description: S3 バケット内のプレフィックス
+
+Resources:
+  # ==========================================================================
+  # VPC
+  # ==========================================================================
+  DemoVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: AgenticHandsonVPC
+
+  DemoSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DemoVPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: AgenticHandsonSubnet
+
+  DemoIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: AgenticHandsonIGW
+
+  DemoIGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DemoVPC
+      InternetGatewayId: !Ref DemoIGW
+
+  DemoRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DemoVPC
+      Tags:
+        - Key: Name
+          Value: AgenticHandsonRT
+
+  DemoRoute:
+    Type: AWS::EC2::Route
+    DependsOn: DemoIGWAttachment
+    Properties:
+      RouteTableId: !Ref DemoRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref DemoIGW
+
+  DemoSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DemoSubnet
+      RouteTableId: !Ref DemoRouteTable
+
+  # ==========================================================================
+  # Security Group (Session Manager 経由のためインバウンド不要)
+  # ==========================================================================
+  DemoSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Agentic Handson Demo - Session Manager only
+      VpcId: !Ref DemoVPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound (SSM, Bedrock API, S3, etc.)
+      Tags:
+        - Key: Name
+          Value: AgenticHandsonSG
+
+  # ==========================================================================
+  # IAM Role (Session Manager + Bedrock + AgentCore + S3 + CloudWatch)
+  # ==========================================================================
+  DemoInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AgenticHandsonEC2Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudWatchFullAccessV2
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+        - arn:aws:iam::aws:policy/IAMFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+      Policies:
+        - PolicyName: BedrockAgentCoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:*
+                  - bedrock-agentcore-control:*
+                  - bedrock-agent:*
+                  - bedrock-agent-runtime:*
+                Resource: '*'
+        - PolicyName: CloudWatchLogsFullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DeleteLogGroup
+                  - logs:DeleteLogStream
+                  - logs:DescribeLogGroups
+                Resource: '*'
+
+  DemoInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref DemoInstanceRole
+
+  # ==========================================================================
+  # EC2 Instance
+  # ==========================================================================
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref DemoInstanceProfile
+      SubnetId: !Ref DemoSubnet
+      SecurityGroupIds:
+        - !Ref DemoSecurityGroup
+      ImageId: !FindInMap [RegionAMI, !Ref 'AWS::Region', AMI]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+      Tags:
+        - Key: Name
+          Value: AgenticHandsonInstance
+        - Key: Project
+          Value: BuildingAdvancedAgenticSystems
+        - Key: AutoStop
+          Value: "true"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -x
+          exec > /var/log/user-data.log 2>&1
+
+          echo "=========================================="
+          echo " ハンズオンデモ環境セットアップ開始"
+          echo " $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "=========================================="
+
+          # システム更新と基本ツール (Amazon Linux 2023 = dnf ベース)
+          echo "[1/5] システム更新..."
+          dnf update -y
+          dnf install -y python3.12 python3.12-pip jq unzip tar git
+
+          # Python 設定
+          echo "[2/5] Python ライブラリ..."
+          pip3.12 install --upgrade pip
+          pip3.12 install boto3 requests numpy
+          pip3.12 install strands-agents strands-agents-tools
+          pip3.12 install bedrock-agentcore bedrock-agentcore-starter-toolkit
+          pip3.12 install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp
+
+          # AWS SAM CLI
+          echo "[3/5] SAM CLI..."
+          pip3.12 install aws-sam-cli
+
+          # S3 からハンズオン資材をダウンロード
+          echo "[4/5] S3 から資材ダウンロード..."
+          WORK_DIR=/home/ssm-user/handson
+          mkdir -p /home/ssm-user
+          mkdir -p $WORK_DIR
+          aws s3 cp s3://${AssetsBucket}/${AssetsPrefix}/handson.tar.gz /tmp/handson.tar.gz
+          tar -xzf /tmp/handson.tar.gz -C $WORK_DIR --strip-components=1
+          rm -f /tmp/handson.tar.gz
+          chown -R ssm-user:ssm-user /home/ssm-user
+          chmod -R 755 /home/ssm-user/handson
+
+          # リージョン設定
+          echo "[5/5] 環境設定..."
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+          if [ -z "$AWS_REGION" ]; then AWS_REGION=us-east-1; fi
+          sudo -u ssm-user aws configure set region $AWS_REGION
+
+          # Bedrock モデル確認
+          echo ""
+          echo "=== Bedrock モデルアクセス確認 ==="
+          for model in amazon.nova-lite-v1:0 amazon.nova-pro-v1:0; do
+            r=$(aws bedrock get-foundation-model --model-identifier "$model" --query "modelDetails.modelId" --output text 2>/dev/null || echo "NG")
+            [ "$r" != "NG" ] && echo "  ✅ $model" || echo "  ⚠  $model (要有効化)"
+          done
+
+          echo ""
+          echo "=========================================="
+          echo " セットアップ完了! $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "=========================================="
+
+  # ==========================================================================
+  # Auto Stop (EventBridge + Lambda: 毎日 23:00 JST に自動停止)
+  # ==========================================================================
+  StopInstanceFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: StopAgenticHandsonInstance
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 30
+      Role: !GetAtt StopInstanceRole.Arn
+      Environment:
+        Variables:
+          INSTANCE_ID: !Ref DemoInstance
+      Code:
+        ZipFile: |
+          import boto3
+          import os
+          def handler(event, context):
+              ec2 = boto3.client('ec2')
+              instance_id = os.environ['INSTANCE_ID']
+              ec2.stop_instances(InstanceIds=[instance_id])
+              print(f"Stopped instance: {instance_id}")
+              return {"status": "stopped"}
+
+  StopInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StopEC2
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ec2:StopInstances
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  StopScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Auto-stop demo instance daily at 23:00 JST (14:00 UTC)"
+      ScheduleExpression: cron(0 14 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StopInstanceFunction.Arn
+          Id: StopAgenticInstance
+
+  StopSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StopInstanceFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StopScheduleRule.Arn
+
+# ==========================================================================
+# Mappings
+# ==========================================================================
+Mappings:
+  RegionAMI:
+    us-east-1:
+      AMI: ami-0bdc7d025135d7b49
+    us-west-2:
+      AMI: ami-0735c191cf914754d
+    ap-northeast-1:
+      AMI: ami-0d52744d6551d851e
+
+# ==========================================================================
+# Outputs
+# ==========================================================================
+Outputs:
+  InstanceId:
+    Value: !Ref DemoInstance
+    Description: "EC2 Instance ID"
+
+  SessionManagerConnect:
+    Value: !Sub "aws ssm start-session --target ${DemoInstance} --region ${AWS::Region}"
+    Description: "Session Manager connect command"
+
+  ConsoleURL:
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/systems-manager/session-manager/${DemoInstance}"
+    Description: "Session Manager console URL"
+
+  StartCommand:
+    Value: !Sub "aws ec2 start-instances --instance-ids ${DemoInstance} --region ${AWS::Region}"
+    Description: "Start instance command"
+
+  StopCommand:
+    Value: !Sub "aws ec2 stop-instances --instance-ids ${DemoInstance} --region ${AWS::Region}"
+    Description: "Stop instance command"
+
+  VpcId:
+    Value: !Ref DemoVPC
+    Description: "VPC ID"
