@@ -58,7 +58,6 @@ INSTANCE_ID=$(aws cloudformation describe-stacks \
 aws ssm start-session --target $INSTANCE_ID
 
 # 接続後
-sudo su - ssm-user
 cd ~/handson
 ```
 
@@ -88,7 +87,6 @@ AWS コンソール → Bedrock → Model access で以下を有効化:
 
 # 2. EC2 内で再取得
 aws ssm start-session --target <INSTANCE_ID>
-sudo su - ssm-user
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 aws s3 cp s3://handson-agentic-assets-$ACCOUNT_ID/handson-assets/handson.tar.gz /tmp/
 rm -rf ~/handson

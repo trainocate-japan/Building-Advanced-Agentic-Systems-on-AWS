@@ -37,7 +37,6 @@
 ### ステップ 2.1: プロジェクトの準備
 
 ```bash
-sudo su - ssm-user
 cd ~/handson/M01-multi-agent
 ```
 

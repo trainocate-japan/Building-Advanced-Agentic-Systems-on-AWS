@@ -5,7 +5,6 @@
 ### ステップ 1.1: プロジェクトの準備
 
 ```bash
-sudo su - ssm-user
 cd ~/handson/M04-observability-evaluation
 ```
 
