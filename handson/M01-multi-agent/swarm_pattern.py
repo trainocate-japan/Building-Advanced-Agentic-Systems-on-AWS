@@ -20,7 +20,7 @@ from strands.multiagent.swarm import Swarm
 
 research_analyst = Agent(
     model="us.amazon.nova-pro-v1:0",
-    system_prompt="""あなたはリサーチアナリストです。
+    system_prompt="""あなたはリサーチアナリストです。必ず日本語で回答してください。
 与えられた問題に対して、データ収集と分析を行います。
 
 あなたの役割：
@@ -34,7 +34,7 @@ research_analyst = Agent(
 
 strategy_consultant = Agent(
     model="us.amazon.nova-pro-v1:0",
-    system_prompt="""あなたは戦略コンサルタントです。
+    system_prompt="""あなたは戦略コンサルタントです。必ず日本語で回答してください。
 リサーチ結果に基づいて、戦略的な提案を行います。
 
 あなたの役割：
@@ -48,7 +48,7 @@ strategy_consultant = Agent(
 
 implementation_engineer = Agent(
     model="us.amazon.nova-pro-v1:0",
-    system_prompt="""あなたは実装エンジニアです。
+    system_prompt="""あなたは実装エンジニアです。必ず日本語で回答してください。
 戦略的な提案を具体的な実装計画に落とし込みます。
 
 あなたの役割：
