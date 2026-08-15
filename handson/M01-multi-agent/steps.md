@@ -126,7 +126,7 @@ Swarm パターンの特徴：
 2. 左ナビゲーションペインで **Memory** を選択
 3. **Create memory** をクリック
 4. 以下を入力：
-   - **Memory name**: `customer-support-shared-memory`
+   - **Memory name**: `customer_support_shared_memory`
    - **Short-term memory (raw event) expiration**: `7` days
 5. **Additional configurations** を展開：
    - **Memory description**: `マルチエージェントカスタマーサポートの共有メモリ`

@@ -21,7 +21,7 @@ bedrock_client = boto3.client("bedrock-agent-runtime", region_name="us-east-1")
 # =============================================================================
 # 定数定義
 # =============================================================================
-MEMORY_ID = "customer-support-shared-memory"
+MEMORY_ID = "customer_support_shared_memory"
 SESSION_ID = f"session-{uuid.uuid4().hex[:8]}"
 
 # エージェント別の actor_id
