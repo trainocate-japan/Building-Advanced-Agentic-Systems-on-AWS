@@ -130,8 +130,33 @@ Swarm パターンの特徴：
    - **Short-term memory (raw event) expiration**: `7` days
 5. **Additional configurations** を展開：
    - **Memory description**: `マルチエージェントカスタマーサポートの共有メモリ`
-6. **Long-term memory extraction strategies** で以下を選択：
-   - 利用可能な組み込み戦略にチェック（セマンティック検索に使用）
+6. **Long-term memory extraction strategies** セクションで戦略を追加：
+
+   画面上部に **Summarization**（要約）と **Semantic**（セマンティック）の 2 種類が表示されます。
+
+   **Semantic 戦略を追加:**
+   1. **Semantic** カードをクリック
+   2. 右側に設定パネルが開く：
+      - **戦略名前**: `semantic_memory`（英数字とアンダースコアのみ）
+      - **戦略タイプ**: セマンティック
+      - **名前空間**: デフォルトのまま（`/strategies/{memoryStrategyId}/actors/{actorId}/`）
+   3. **Extraction** セクションを展開：
+      - モデルを選択（例: **Amazon Nova Lite**）
+      - プロンプトはデフォルトのまま
+   4. **Consolidation** セクションを展開：
+      - モデルを選択（例: **Amazon Nova Lite**）
+      - プロンプトはデフォルトのまま
+   5. **Create strategy** をクリック
+
+   **（オプション）Summarization 戦略も追加:**
+   1. **Summarization** カードをクリック
+   2. 右側に設定パネルが開く：
+      - **戦略名前**: `summarization_memory`
+      - **戦略タイプ**: 要約
+      - **名前空間**: デフォルトのまま
+   3. **Extraction** / **Consolidation** でモデルを選択
+   4. **Create strategy** をクリック
+
 7. **Create memory** をクリック
 
 ### ステップ 5.2: 作成した Memory の確認
