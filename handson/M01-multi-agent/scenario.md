@@ -67,5 +67,5 @@ Strands Agents SDK を使用して、以下の 3 つのオーケストレーシ�
   - `strands-agents-tools`
   - `bedrock-agentcore`
 - Amazon Bedrock で以下のモデルアクセスが有効化済み：
-  - Anthropic Claude Sonnet 4
+  - Anthropic Claude Sonnet 4.6
   - Amazon Nova Lite / Pro

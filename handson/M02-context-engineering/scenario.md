@@ -67,5 +67,5 @@
   - `bedrock-agentcore`
   - `boto3`
 - Amazon Bedrock で以下のモデルアクセスが有効化済み：
-  - Anthropic Claude Sonnet 4（プロンプトキャッシュ対応）
+  - Anthropic Claude Sonnet 4.6（プロンプトキャッシュ対応）
   - Amazon Nova Pro / Lite

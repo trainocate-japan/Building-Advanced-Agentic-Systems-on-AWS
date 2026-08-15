@@ -39,8 +39,7 @@ Bedrock チャットプレイグラウンドでプロンプトキャッシュの
 1. AWS コンソールで **Amazon Bedrock** を開く: https://console.aws.amazon.com/bedrock/
 2. 左ナビゲーションペインの **Test playgrounds** → **Chat/Text** を選択
 3. **Select model** をクリック
-4. **Anthropic** → **Claude Sonnet 4** を選択し **Apply**
-   - v1 が Legacy エラーになる場合は最新バージョン（v2）を選択してください
+4. **Anthropic** → **Claude Sonnet 4.6** を選択し、推論プロファイルで **US Claude Sonnet 4.6** を選択して **適用**
 
 ### ステップ 2.2: プロンプトキャッシュの有効化
 

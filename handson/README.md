@@ -24,7 +24,7 @@
 - AWS SAM CLI インストール済み
 - Amazon Bedrock モデルアクセス有効化済み
   - Amazon Nova Lite / Pro
-  - Anthropic Claude Sonnet 4
+  - Anthropic Claude Sonnet 4.6
 
 ### Python パッケージ
 - `boto3`

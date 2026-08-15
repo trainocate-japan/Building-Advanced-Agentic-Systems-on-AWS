@@ -20,7 +20,7 @@ import time
 bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
 
 # プロンプトキャッシュ対応モデル
-MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v2:0"
+MODEL_ID = "us.anthropic.claude-sonnet-4-6-20250725-v1:0"
 
 
 # =============================================================================
