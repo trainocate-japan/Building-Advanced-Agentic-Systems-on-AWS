@@ -74,8 +74,7 @@ def run_swarm_pattern():
 
     # Swarm の構成
     swarm = Swarm(
-        agents=[research_analyst, strategy_consultant, implementation_engineer],
-        swarm_name="business_advisory_swarm"
+        nodes=[research_analyst, strategy_consultant, implementation_engineer],
     )
 
     # テストシナリオ
