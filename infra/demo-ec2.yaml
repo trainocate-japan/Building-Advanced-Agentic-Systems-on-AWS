@@ -204,8 +204,13 @@ Resources:
           echo 'cd ~/handson 2>/dev/null' >> /home/ssm-user/.bashrc
           echo 'cd ~/handson 2>/dev/null' >> /home/ssm-user/.bash_profile
 
-          # python コマンドでどこからでも実行できるようにシンボリックリンク作成
-          ln -sf $VENV_DIR/bin/python /usr/local/bin/python
+          # python コマンドでどこからでも実行できるようにラッパー作成
+          cat > /usr/local/bin/python << 'WRAPPER'
+          #!/bin/bash
+          source /home/ssm-user/.venv/bin/activate
+          exec python "$@"
+          WRAPPER
+          chmod +x /usr/local/bin/python
           ln -sf $VENV_DIR/bin/pip /usr/local/bin/pip
 
           # S3 からハンズオン資材をダウンロード
