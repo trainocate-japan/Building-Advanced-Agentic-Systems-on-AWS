@@ -130,32 +130,28 @@ Swarm パターンの特徴：
    - **Short-term memory (raw event) expiration**: `7` days
 5. **Additional configurations** を展開：
    - **Memory description**: `マルチエージェントカスタマーサポートの共有メモリ`
-6. **Long-term memory extraction strategies** セクションで戦略を追加：
 
-   画面上部に **Summarization**（要約）と **Semantic**（セマンティック）の 2 種類が表示されます。
+6. **Long-term memory extraction strategies** セクションで組み込み戦略を追加：
 
-   **Semantic 戦略を追加:**
-   1. **Semantic** カードをクリック
-   2. 右側に設定パネルが開く：
-      - **戦略名前**: `semantic_memory`（英数字とアンダースコアのみ）
-      - **戦略タイプ**: セマンティック
+   **セマンティックメモリ戦略の追加:**
+   1. **組み込み戦略** セクションの **Add strategy** ボタンをクリック
+   2. ドロップダウンから **セマンティックメモリ** を選択
+   3. 設定ダイアログが表示される：
+      - **戦略名前**: 自動生成された名前のまま（例: `semantic_builtin_xxxxx`）
       - **名前空間**: デフォルトのまま（`/strategies/{memoryStrategyId}/actors/{actorId}/`）
-   3. **Extraction** セクションを展開：
-      - モデルを選択（例: **Amazon Nova Lite**）
-      - プロンプトはデフォルトのまま
-   4. **Consolidation** セクションを展開：
-      - モデルを選択（例: **Amazon Nova Lite**）
-      - プロンプトはデフォルトのまま
-   5. **Create strategy** をクリック
-
-   **（オプション）Summarization 戦略も追加:**
-   1. **Summarization** カードをクリック
-   2. 右側に設定パネルが開く：
-      - **戦略名前**: `summarization_memory`
-      - **戦略タイプ**: 要約
-      - **名前空間**: デフォルトのまま
-   3. **Extraction** / **Consolidation** でモデルを選択
+      - **Metadata definition**: デフォルトのまま
    4. **Create strategy** をクリック
+
+   **要約戦略の追加:**
+   1. 再度 **Add strategy** ボタンをクリック
+   2. ドロップダウンから **要約** を選択
+   3. 設定ダイアログが表示される：
+      - **戦略名前**: 自動生成された名前のまま（例: `summary_builtin_xxxxx`）
+      - **名前空間**: デフォルトのまま（`/strategies/{memoryStrategyId}/actors/{actorId}/sessions/{sessionId}/`）
+      - **Metadata definition**: デフォルトのまま
+   4. **Create strategy** をクリック
+
+   > ℹ️ 他にも「ユーザープリファレンス」「Episodes」が選択可能です。今回は上記 2 つで十分です。
 
 7. **Create memory** をクリック
 
