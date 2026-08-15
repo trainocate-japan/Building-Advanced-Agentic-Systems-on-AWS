@@ -1,18 +1,19 @@
 """
 モジュール 1: Workflow パターン - マルチエージェントカスタマーサポート
 
-Strands Agents SDK の Workflow パターンを使用して、
-事前定義された順序で専門エージェントが連携するパイプラインを構築します。
+Strands Agents SDK を使用して、事前定義された順序で
+専門エージェントが連携するパイプラインを構築します。
 
-Workflow の特徴:
-- 1 つのツールとして実行される定義済みのタスクグラフ (DAG)
-- 信頼性が求められる反復可能で複雑な操作に使用
-- 各ステップは決定論的に実行される
+Workflow パターンの特徴:
+- 各ステップは決定論的に順次実行される
+- 前のエージェントの出力が次のエージェントの入力になる
+- 堅牢なエラー処理とステート管理が可能
+
+※ Strands SDK では Graph を直線的に構成することで Workflow を実現します。
 """
 
-import json
-from strands import Agent, tool
-from strands.multiagent.workflow import Workflow, WorkflowStep
+from strands import Agent
+from strands.multiagent.graph import Graph, GraphBuilder
 
 # =============================================================================
 # 専門エージェントの定義
@@ -28,8 +29,10 @@ classifier_agent = Agent(
 - billing: 請求・支払いに関する問題（料金の不明点、返金要求等）
 - product: 商品に関する問い合わせ（レコメンデーション、在庫確認等）
 
-必ず JSON 形式で回答してください:
-{"category": "カテゴリ名", "confidence": 0.0-1.0, "summary": "要約"}"""
+必ず以下の形式で回答してください:
+カテゴリ: [カテゴリ名]
+要約: [問い合わせの要約]""",
+    name="classifier"
 )
 
 # 調査エージェント: 関連情報を収集する
@@ -40,11 +43,9 @@ research_agent = Agent(
 
 以下の情報を提供してください：
 - 関連するFAQ項目
-- 過去の類似ケースの解決策
-- 必要に応じたエスカレーション基準
-
-JSON 形式で回答してください:
-{"findings": ["項目1", "項目2"], "recommended_action": "推奨アクション", "escalation_needed": true/false}"""
+- 推奨される解決策
+- エスカレーションが必要かどうか""",
+    name="researcher"
 )
 
 # 回答生成エージェント: 最終回答を生成する
@@ -56,11 +57,12 @@ response_agent = Agent(
 回答は以下の要件を満たす必要があります：
 - 丁寧で専門的なトーン
 - 具体的な解決策や次のステップを含む
-- 必要に応じてエスカレーション先を案内"""
+- 必要に応じてエスカレーション先を案内""",
+    name="responder"
 )
 
 # =============================================================================
-# Workflow の構築と実行
+# Workflow（順次パイプライン）の実行
 # =============================================================================
 
 def run_workflow():
