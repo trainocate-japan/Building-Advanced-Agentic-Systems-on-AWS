@@ -129,7 +129,7 @@ Swarm パターンの特徴：
    - **Memory name**: `customer_support_shared_memory`
    - **Short-term memory (raw event) expiration**: `7` days
 5. **Additional configurations** を展開：
-   - **Memory description**: `マルチエージェントカスタマーサポートの共有メモリ`
+   - **Memory description**: `Shared memory for multi-agent customer support`
 
 6. **Long-term memory extraction strategies** セクションで組み込み戦略を追加：
 
