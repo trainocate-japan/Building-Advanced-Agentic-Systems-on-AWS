@@ -40,6 +40,7 @@ Bedrock チャットプレイグラウンドでプロンプトキャッシュの
 2. 左ナビゲーションペインの **Test playgrounds** → **Chat/Text** を選択
 3. **Select model** をクリック
 4. **Anthropic** → **Claude Sonnet 4** を選択し **Apply**
+   - v1 が Legacy エラーになる場合は最新バージョン（v2）を選択してください
 
 ### ステップ 2.2: プロンプトキャッシュの有効化
 
