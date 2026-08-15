@@ -197,11 +197,16 @@ Resources:
           pip install strands-agents strands-agents-tools
           pip install bedrock-agentcore bedrock-agentcore-starter-toolkit
           pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp
-          pip install aws-sam-cli
 
           # ssm-user のログイン時に自動 activate
           echo "source $VENV_DIR/bin/activate" >> /home/ssm-user/.bashrc
+          echo "source $VENV_DIR/bin/activate" >> /home/ssm-user/.bash_profile
           echo 'cd ~/handson 2>/dev/null' >> /home/ssm-user/.bashrc
+          echo 'cd ~/handson 2>/dev/null' >> /home/ssm-user/.bash_profile
+
+          # python コマンドでどこからでも実行できるようにシンボリックリンク作成
+          ln -sf $VENV_DIR/bin/python /usr/local/bin/python
+          ln -sf $VENV_DIR/bin/pip /usr/local/bin/pip
 
           # S3 からハンズオン資材をダウンロード
           echo "[3/5] S3 から資材ダウンロード..."
