@@ -20,7 +20,7 @@ cd ~/handson/M04-observability-evaluation
 ### ステップ 1.3: トレーシングデモの実行
 
 ```bash
-python3.12 otel_tracing.py
+python otel_tracing.py
 ```
 
 出力を確認し、以下を議論します：
@@ -63,7 +63,7 @@ AgentCore Observability は CloudWatch の GenAI Observability ページに統�
 まずエージェントのメトリクスデータを送信します：
 
 ```bash
-python3.12 cloudwatch_dashboard.py
+python cloudwatch_dashboard.py
 ```
 
 これにより、`AgenticAI/CustomerSupport` ネームスペースにカスタムメトリクスが送信されます。
@@ -244,7 +244,7 @@ echo "アップロード完了: s3://$BUCKET/evaluation/evaluation-dataset.jsonl
 コンソールの組み込み評価に加えて、業務固有のカスタム評価基準でも評価を行います：
 
 ```bash
-python3.12 agent_evaluation.py
+python agent_evaluation.py
 ```
 
 このスクリプトは以下のカスタムエバリュエーターを実行します：

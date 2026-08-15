@@ -20,8 +20,7 @@
 ### 環境要件
 - AWS アカウント（管理者アクセス）
 - AWS CLI v2 設定済み
-- Python 3.12+
-- Node.js 18+
+- Python 3.12+（EC2 環境では venv が自動で有効化されます）
 - AWS SAM CLI インストール済み
 - Amazon Bedrock モデルアクセス有効化済み
   - Amazon Nova Lite / Pro

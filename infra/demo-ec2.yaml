@@ -187,20 +187,24 @@ Resources:
           dnf update -y
           dnf install -y python3.12 python3.12-pip jq unzip tar git
 
-          # Python 設定
-          echo "[2/5] Python ライブラリ..."
-          pip3.12 install --upgrade pip
-          pip3.12 install boto3 requests numpy
-          pip3.12 install strands-agents strands-agents-tools
-          pip3.12 install bedrock-agentcore bedrock-agentcore-starter-toolkit
-          pip3.12 install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp
+          # Python venv 作成
+          echo "[2/5] Python venv セットアップ..."
+          VENV_DIR=/home/ssm-user/.venv
+          python3.12 -m venv $VENV_DIR
+          source $VENV_DIR/bin/activate
+          pip install --upgrade pip
+          pip install boto3 requests numpy
+          pip install strands-agents strands-agents-tools
+          pip install bedrock-agentcore bedrock-agentcore-starter-toolkit
+          pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp
+          pip install aws-sam-cli
 
-          # AWS SAM CLI
-          echo "[3/5] SAM CLI..."
-          pip3.12 install aws-sam-cli
+          # ssm-user のログイン時に自動 activate
+          echo "source $VENV_DIR/bin/activate" >> /home/ssm-user/.bashrc
+          echo 'cd ~/handson 2>/dev/null' >> /home/ssm-user/.bashrc
 
           # S3 からハンズオン資材をダウンロード
-          echo "[4/5] S3 から資材ダウンロード..."
+          echo "[3/5] S3 から資材ダウンロード..."
           WORK_DIR=/home/ssm-user/handson
           mkdir -p /home/ssm-user
           mkdir -p $WORK_DIR
@@ -211,15 +215,14 @@ Resources:
           chmod -R 755 /home/ssm-user/handson
 
           # リージョン設定
-          echo "[5/5] 環境設定..."
+          echo "[4/5] 環境設定..."
           TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
           AWS_REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
           if [ -z "$AWS_REGION" ]; then AWS_REGION=us-east-1; fi
           sudo -u ssm-user aws configure set region $AWS_REGION
 
           # Bedrock モデル確認
-          echo ""
-          echo "=== Bedrock モデルアクセス確認 ==="
+          echo "[5/5] Bedrock モデルアクセス確認..."
           for model in amazon.nova-lite-v1:0 amazon.nova-pro-v1:0; do
             r=$(aws bedrock get-foundation-model --model-identifier "$model" --query "modelDetails.modelId" --output text 2>/dev/null || echo "NG")
             [ "$r" != "NG" ] && echo "  ✅ $model" || echo "  ⚠  $model (要有効化)"
@@ -228,6 +231,8 @@ Resources:
           echo ""
           echo "=========================================="
           echo " セットアップ完了! $(date '+%Y-%m-%d %H:%M:%S')"
+          echo " 接続後は自動で venv が有効化されます"
+          echo " python コマンドでスクリプトを実行できます"
           echo "=========================================="
 
   # ==========================================================================

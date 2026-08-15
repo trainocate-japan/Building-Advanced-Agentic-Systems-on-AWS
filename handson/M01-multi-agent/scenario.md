@@ -61,7 +61,7 @@ Strands Agents SDK を使用して、以下の 3 つのオーケストレーシ�
 ## 前提条件
 
 - AWS CLI 設定済み
-- Python 3.12+ インストール済み
+- Python 3.12+（EC2 環境では venv 自動有効化）
 - 以下の Python パッケージがインストール済み：
   - `strands-agents`
   - `strands-agents-tools`

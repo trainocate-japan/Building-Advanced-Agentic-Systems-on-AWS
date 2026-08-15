@@ -20,7 +20,7 @@ TOON（Token-Oriented Object Notation）の特徴：
 ### ステップ 1.3: 最適化デモの実行
 
 ```bash
-python3.12 context_optimization.py
+python context_optimization.py
 ```
 
 出力を確認し、以下を議論します：
@@ -170,7 +170,7 @@ Strands SDK の 3 種類の会話マネージャー：
 ### ステップ 3.2: SummarizingConversationManager の実行
 
 ```bash
-python3.12 summarizing_manager.py
+python summarizing_manager.py
 ```
 
 出力を確認し、以下を議論します：
@@ -194,7 +194,7 @@ python3.12 summarizing_manager.py
 ### ステップ 4.1: コンテキスト分離デモの実行
 
 ```bash
-python3.12 context_isolation.py
+python context_isolation.py
 ```
 
 ### ステップ 4.2: 比較結果の確認

@@ -73,7 +73,7 @@ AgentCore の Identity、Policy、Guardrails を活用して、多層防御の�
 ## 前提条件
 
 - AWS CLI 設定済み
-- Python 3.12+ インストール済み
+- Python 3.12+（EC2 環境では venv 自動有効化）
 - 以下の Python パッケージがインストール済み：
   - `boto3`
   - `strands-agents`

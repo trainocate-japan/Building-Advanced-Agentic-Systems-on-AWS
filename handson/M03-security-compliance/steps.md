@@ -11,7 +11,7 @@ cd ~/handson/M03-security-compliance
 ### ステップ 1.2: AgentCore Identity の概要確認
 
 ```bash
-python3.12 agentcore_identity_demo.py
+python agentcore_identity_demo.py
 ```
 
 出力を確認し、以下のアーキテクチャを理解します：
@@ -37,7 +37,7 @@ python3.12 agentcore_identity_demo.py
 ### ステップ 2.1: Cedar ポリシーデモの実行
 
 ```bash
-python3.12 agentcore_policy_demo.py
+python agentcore_policy_demo.py
 ```
 
 出力を確認し、Cedar ポリシーの認可フローを理解します：
@@ -210,7 +210,7 @@ when {
 ### ステップ 4.1: 監査ログデモの実行
 
 ```bash
-python3.12 audit_logging.py
+python audit_logging.py
 ```
 
 出力を確認し、エージェンティック AI の監査証跡の構造を理解します。

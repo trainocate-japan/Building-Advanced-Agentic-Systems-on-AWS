@@ -46,7 +46,7 @@ cd ~/handson/M01-multi-agent
 1. **分類エージェント** → 2. **調査エージェント** → 3. **回答エージェント**
 
 ```bash
-python3.12 workflow_pattern.py
+python workflow_pattern.py
 ```
 
 出力を確認し、以下を議論します：
@@ -67,7 +67,7 @@ python3.12 workflow_pattern.py
 ### ステップ 3.1: Graph パターンの実行
 
 ```bash
-python3.12 graph_pattern.py
+python graph_pattern.py
 ```
 
 Graph パターンの構造：
@@ -102,7 +102,7 @@ Graph パターンの構造：
 ### ステップ 4.1: Swarm パターンの実行
 
 ```bash
-python3.12 swarm_pattern.py
+python swarm_pattern.py
 ```
 
 Swarm パターンの特徴：
@@ -144,7 +144,7 @@ Swarm パターンの特徴：
 ### ステップ 5.3: 共有メモリデモの実行
 
 ```bash
-python3.12 shared_memory_demo.py
+python shared_memory_demo.py
 ```
 
 出力を確認し、以下を議論します：
@@ -167,7 +167,7 @@ python3.12 shared_memory_demo.py
 ### ステップ 6.1: MCP 統合デモの実行
 
 ```bash
-python3.12 mcp_tool_agent.py
+python mcp_tool_agent.py
 ```
 
 ツールとしてのエージェントパターンの特徴：
