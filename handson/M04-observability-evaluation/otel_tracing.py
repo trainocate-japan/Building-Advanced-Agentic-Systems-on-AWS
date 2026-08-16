@@ -41,6 +41,9 @@ LOG_GROUP = f"/aws/bedrock-agentcore/runtimes/{AGENT_NAME}"
 
 def setup_environment():
     """AgentCore Observability 用の環境変数を設定"""
+    region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+    os.environ["AWS_REGION"] = region
+    os.environ["AWS_DEFAULT_REGION"] = region
     os.environ["AGENT_OBSERVABILITY_ENABLED"] = "true"
     os.environ["OTEL_PYTHON_DISTRO"] = "aws_distro"
     os.environ["OTEL_PYTHON_CONFIGURATOR"] = "aws_configurator"
@@ -57,6 +60,7 @@ def setup_environment():
     )
 
     print(f"  Agent Name: {AGENT_NAME}")
+    print(f"  Region: {region}")
     print(f"  Log Group: {LOG_GROUP}")
     print(f"  OTLP Protocol: http/protobuf")
 
@@ -114,7 +118,8 @@ def main():
     # Step 3: ロググループ作成
     print("\n[Step 3] CloudWatch ロググループを作成...")
     import boto3
-    logs_client = boto3.client("logs")
+    region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+    logs_client = boto3.client("logs", region_name=region)
     try:
         logs_client.create_log_group(logGroupName=LOG_GROUP)
         print(f"  ✅ ロググループ作成: {LOG_GROUP}")
