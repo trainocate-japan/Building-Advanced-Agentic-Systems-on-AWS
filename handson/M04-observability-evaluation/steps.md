@@ -19,9 +19,17 @@ cd ~/handson/M04-observability-evaluation
 
 ### ステップ 1.3: トレーシングデモの実行
 
+ADOT SDK 経由で実行するため、ラッパースクリプトを使います：
+
 ```bash
-python otel_tracing.py
+bash run_otel_tracing.sh
 ```
+
+このスクリプトは以下を行います：
+1. CloudWatch ロググループを作成
+2. ADOT 用の環境変数をセット
+3. `opentelemetry-instrument` コマンド経由でエージェントを実行（自動計装）
+4. トレースデータが CloudWatch に送信される
 
 出力を確認し、以下を議論します：
 - トレース全体の構造（親スパン → 子スパン）
