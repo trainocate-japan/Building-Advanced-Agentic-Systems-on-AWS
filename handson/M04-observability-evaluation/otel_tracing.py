@@ -16,24 +16,20 @@ import os
 import sys
 import time
 import uuid
-import subprocess
 
 # =============================================================================
 # ADOT SDK のインストール確認
 # =============================================================================
 
 def ensure_adot_installed():
-    """ADOT SDK がインストールされていなければインストール"""
+    """ADOT SDK がインストールされているか確認"""
     try:
         import amazon.opentelemetry.distro
         print("  ✅ ADOT SDK インストール済み")
     except ImportError:
-        print("  ADOT SDK をインストール中...")
-        subprocess.check_call([
-            sys.executable, "-m", "pip", "install",
-            "aws-opentelemetry-distro", "-q"
-        ])
-        print("  ✅ ADOT SDK インストール完了")
+        print("  ❌ ADOT SDK が見つかりません。以下を実行してください:")
+        print("     pip install aws-opentelemetry-distro")
+        sys.exit(1)
 
 
 # =============================================================================
