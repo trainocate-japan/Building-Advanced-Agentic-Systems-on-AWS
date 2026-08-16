@@ -18,7 +18,7 @@ export AGENT_OBSERVABILITY_ENABLED=true
 export OTEL_PYTHON_DISTRO=aws_distro
 export OTEL_PYTHON_CONFIGURATOR=aws_configurator
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_RESOURCE_ATTRIBUTES="service.name=${AGENT_NAME}"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=${AGENT_NAME},aws.log.group.names=${LOG_GROUP}"
 export OTEL_EXPORTER_OTLP_LOGS_HEADERS="x-aws-log-group=${LOG_GROUP},x-aws-log-stream=runtime-logs,x-aws-metric-namespace=bedrock-agentcore"
 # スパンは aws/spans (デフォルト) に送信。カスタムロググループへの送信はリソースポリシー設定が別途必要。
 
