@@ -41,34 +41,29 @@ def get_default_dataset() -> list:
     """デフォルトの評価データセット"""
     return [
         {
-            "input": "注文 ORD-12345 の配送状況を教えてください",
-            "expected_output": "注文の配送状況を確認し、具体的な配送日と追跡番号を提供する",
-            "category": "order_inquiry",
-            "complexity": "simple"
+            "prompt": "注文 ORD-12345 の配送状況を教えてください",
+            "referenceResponse": "注文の配送状況を確認し、具体的な配送日と追跡番号を提供する",
+            "category": "order_inquiry"
         },
         {
-            "input": "先月の請求が二重になっている気がします。確認して返金してください。",
-            "expected_output": "請求履歴を確認し、二重請求があれば返金処理を案内する。金額と処理期間を明示する。",
-            "category": "billing_dispute",
-            "complexity": "medium"
+            "prompt": "先月の請求が二重になっている気がします。確認して返金してください。",
+            "referenceResponse": "請求履歴を確認し、二重請求があれば返金処理を案内する。金額と処理期間を明示する。",
+            "category": "billing_dispute"
         },
         {
-            "input": "APIのレート制限に頻繁に引っかかります。エンタープライズプランへのアップグレードを検討していますが、コストパフォーマンスを比較してください。",
-            "expected_output": "現在のプランのレート制限を説明し、エンタープライズプランの特徴とコストを比較。ROI の観点から推奨を提示する。",
-            "category": "plan_upgrade",
-            "complexity": "complex"
+            "prompt": "APIのレート制限に頻繁に引っかかります。エンタープライズプランへのアップグレードを検討していますが、コストパフォーマンスを比較してください。",
+            "referenceResponse": "現在のプランのレート制限を説明し、エンタープライズプランの特徴とコストを比較。ROI の観点から推奨を提示する。",
+            "category": "plan_upgrade"
         },
         {
-            "input": "機密データの取り扱いポリシーについて教えてください。GDPRに準拠していますか？",
-            "expected_output": "データ保護ポリシーの概要を説明し、GDPR 準拠状況を明確に回答する。具体的な保護措置を列挙する。",
-            "category": "compliance",
-            "complexity": "complex"
+            "prompt": "機密データの取り扱いポリシーについて教えてください。GDPRに準拠していますか？",
+            "referenceResponse": "データ保護ポリシーの概要を説明し、GDPR 準拠状況を明確に回答する。具体的な保護措置を列挙する。",
+            "category": "compliance"
         },
         {
-            "input": "こんにちは",
-            "expected_output": "丁寧な挨拶と、どのようなサポートが可能かを案内する",
-            "category": "greeting",
-            "complexity": "simple"
+            "prompt": "こんにちは",
+            "referenceResponse": "丁寧な挨拶と、どのようなサポートが可能かを案内する",
+            "category": "greeting"
         },
     ]
 
@@ -214,13 +209,13 @@ def run_evaluation():
 
     for i, item in enumerate(dataset, 1):
         print(f"\n  ── テストケース {i}/{len(dataset)} ──")
-        print(f"  入力: {item['input']}")
-        print(f"  カテゴリ: {item['category']} / 複雑度: {item['complexity']}")
+        print(f"  入力: {item['prompt']}")
+        print(f"  カテゴリ: {item['category']}")
 
         # エージェント応答を生成
         response = bedrock_runtime.converse(
             modelId=MODEL_ID,
-            messages=[{"role": "user", "content": [{"text": item["input"]}]}],
+            messages=[{"role": "user", "content": [{"text": item["prompt"]}]}],
             system=[{"text": "あなたはプロフェッショナルなカスタマーサポートエージェントです。丁寧で具体的な回答を提供してください。"}],
             inferenceConfig={"maxTokens": 500, "temperature": 0.3}
         )
@@ -228,7 +223,7 @@ def run_evaluation():
         print(f"  応答: {agent_response[:150]}...")
 
         # 評価実行
-        helpfulness = evaluate_helpfulness(item["input"], agent_response, item["expected_output"])
+        helpfulness = evaluate_helpfulness(item["prompt"], agent_response, item["referenceResponse"])
         faithfulness = evaluate_faithfulness(agent_response)
         disclaimer = evaluate_custom_disclaimer(agent_response)
         structure = evaluate_custom_response_structure(agent_response)
@@ -236,7 +231,6 @@ def run_evaluation():
         result = {
             "test_case": i,
             "category": item["category"],
-            "complexity": item["complexity"],
             "helpfulness": helpfulness,
             "faithfulness": faithfulness,
             "disclaimer": disclaimer,
