@@ -1,30 +1,79 @@
 # モジュール 5: Well-Architected エージェンティック AI システム - ハンズオン手順
 
-## パート 1: Well-Architected Framework の適用（15分）
+## パート 1: Well-Architected Tool で Agentic AI Lens レビューを実行する（15分）
 
-### ステップ 1.1: エージェンティック AI の WA 原則
+### ステップ 1.1: Well-Architected Tool コンソールを開く
 
-AWS Well-Architected Framework の Generative AI Lens から、エージェンティック AI に適用される 6 つの原則：
+1. AWS コンソールで **AWS Well-Architected Tool** を開く: https://console.aws.amazon.com/wellarchitected/
+2. 左ナビゲーションペインで **Workloads** を選択
 
-1. **すべての統合ポイントにオブザーバビリティを実装する**
-2. **制御性を考慮した設計を行う**
-3. **正確性と堅牢性を確保する**
-4. **公平性に関する考慮事項を適用する**
-5. **透明性を維持する**
-6. **ガバナンスを実装する**
+### ステップ 1.2: ワークロードを作成する
 
-### ステップ 1.2: 自律レベルの評価
+1. **Define workload** をクリック
+2. 以下を入力：
+   - **Workload name**: `Agentic Customer Support System`
+   - **Description**: `Multi-agent customer support system built with Strands SDK and AgentCore`
+   - **Environment**: `Pre-production`
+   - **Regions**: `US East (N. Virginia)`
+   - **Account IDs**: 自分のアカウント ID
+3. **Next** をクリック
+4. **Apply profiles** はスキップして **Next** をクリック
 
-エージェンティック AI のセキュリティ要件は自律レベルによって異なります：
+### ステップ 1.3: Agentic AI Lens を適用する
 
-| レベル | 説明 | セキュリティ要件 | 例 |
-|-------|------|----------------|---|
-| No Agency | 人間主導 | 標準認証のみ | FAQ 検索 |
-| Prescribed Agency | 明示的承認必要 | 承認ワークフロー | 返金処理（承認付き） |
-| Supervised Agency | 人間トリガー＋自律実行 | Policy + 監査 | カスタマーサポート |
-| Full Agency | 完全自律 | 多層防御 + リアルタイム監視 | 自動障害対応 |
+1. **Apply lenses** ページで **Lens Catalog** タブを選択
+2. 検索ボックスに `Agentic` と入力
+3. **Agentic AI Lens** にチェックを入れる
+4. **Define Workload** をクリック
 
-### ステップ 1.3: 柱別の設計チェックリスト
+### ステップ 1.4: Agentic AI Lens のレビューを開始する
+
+1. 作成されたワークロードの概要ページが表示される
+2. **Lenses** セクションで **Agentic AI Lens** の **Start reviewing** をクリック
+3. レビュー画面が表示される
+
+### ステップ 1.5: レビュー質問に回答する
+
+Agentic AI Lens の質問に、本ハンズオンで学んだ内容を基に回答します。以下はピラーごとの主な質問例です：
+
+**セキュリティ（M03 の内容）:**
+- エージェントのアイデンティティと認証をどのように管理していますか？
+  → AgentCore Identity (OAuth 2LO/3LO)、IAM ロール
+- エージェントの行動をどのように制御していますか？
+  → AgentCore Policy (Cedar)、Bedrock Guardrails
+- 監査証跡をどのように実装していますか？
+  → CloudTrail、CloudWatch Logs の監査ログ
+
+**信頼性（M01 の内容）:**
+- エージェント間の通信障害にどのように対処していますか？
+  → サーキットブレーカー、フォールバック、グレースフルデグラデーション
+- マルチエージェントのオーケストレーションパターンは？
+  → Graph パターンで条件分岐、Swarm で自律的ハンドオフ
+
+**パフォーマンス効率（M02 の内容）:**
+- コンテキストウィンドウをどのように管理していますか？
+  → SummarizingConversationManager、プロンプトキャッシュ、TOON 形式
+- メモリと状態をどのように管理していますか？
+  → AgentCore Memory（セマンティック + 要約戦略）
+
+**運用上の優秀性（M04 の内容）:**
+- エージェントのオブザーバビリティをどのように実装していますか？
+  → ADOT SDK + AgentCore Observability、CloudWatch ダッシュボード
+- エージェントの品質をどのように評価していますか？
+  → AgentCore Evaluations（LLM-as-a-Judge）、カスタムエバリュエーター
+
+いくつかの質問に回答して、リスク評価がどのように変わるか確認してください。
+
+### ステップ 1.6: リスク評価を確認する
+
+1. 回答後、ワークロード概要ページに戻る
+2. **Agentic AI Lens** のリスクサマリーを確認：
+   - **High risk**: 未対応のベストプラクティス
+   - **Medium risk**: 部分的に対応
+   - **No risk**: 対応済み
+3. **Improvement plan** をクリックして改善提案を確認
+
+---
 
 #### 運用上の優秀性
 
