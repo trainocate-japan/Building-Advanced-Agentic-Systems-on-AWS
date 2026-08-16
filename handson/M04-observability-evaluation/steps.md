@@ -56,96 +56,77 @@ AgentCore Observability は CloudWatch の GenAI Observability ページに統�
 
 ---
 
-## パート 2: CloudWatch ダッシュボード構築（コンソール操作）（15分）
+## パート 2: CloudWatch ダッシュボードとアラーム（10分）
 
-### ステップ 2.1: カスタムメトリクスの送信
+### ステップ 2.1: ダッシュボードとアラームの自動作成
 
-まずエージェントのメトリクスデータを送信します：
+以下のスクリプトを実行すると、カスタムメトリクスの送信・ダッシュボード作成・アラーム作成が一括で行われます：
 
 ```bash
 python cloudwatch_dashboard.py
 ```
 
-これにより、`AgenticAI/CustomerSupport` ネームスペースにカスタムメトリクスが送信されます。
+作成されるリソース：
+- **ダッシュボード**: `AgenticAI-Observability`
+- **アラーム**: `AgenticAI-HighLatency-P95` / `AgenticAI-HighErrorRate` / `AgenticAI-GuardrailSpike`
+- **メトリクス**: `AgenticAI/CustomerSupport` ネームスペースに各エージェントのメトリクス
 
-### ステップ 2.2: CloudWatch ダッシュボードの作成（コンソール）
+### ステップ 2.2: ダッシュボードの確認（コンソール）
 
 1. AWS コンソールで **CloudWatch** を開く: https://console.aws.amazon.com/cloudwatch/
 2. 左ナビゲーションペインで **Dashboards** を選択
-3. **Create dashboard** をクリック
-4. **Dashboard name**: `AgenticAI-Observability` と入力
-5. **Create dashboard** をクリック
+3. **AgenticAI-Observability** をクリック
+4. 以下のウィジェットが表示されていることを確認：
+   - エージェント呼び出し回数（エージェント別）
+   - レイテンシー P50/P95/P99
+   - トークン消費量（Input/Output）
+   - エラー率 & Guardrail 介入
+   - タスク完了率
+   - ツール呼び出し回数
 
-### ステップ 2.3: ウィジェットの追加 - エージェント呼び出し回数
+### ステップ 2.3: アラームの確認（コンソール）
 
-1. **Add widget** ダイアログで **Line** を選択し、**Next** をクリック
-2. **Metrics** タブで以下を選択：
-   - **Custom namespaces** → **AgenticAI/CustomerSupport** → **AgentName** を選択
-   - `InvocationCount` メトリクスのチェックボックスを ON（全エージェント分）
-3. **Graphed metrics** タブに切り替え：
-   - **Statistic**: `Sum`
-   - **Period**: `1 minute`
-4. **Create widget** をクリック
+1. 左ナビゲーションペインで **Alarms** → **All alarms** を選択
+2. `AgenticAI-` で始まるアラームが 3 つ作成されていることを確認：
 
-### ステップ 2.4: ウィジェットの追加 - レイテンシー
+   | アラーム名 | 条件 | 意味 |
+   |-----------|------|------|
+   | AgenticAI-HighLatency-P95 | P95 > 10,000ms | レイテンシー劣化 |
+   | AgenticAI-HighErrorRate | ErrorRate > 5% | エラー率上昇 |
+   | AgenticAI-GuardrailSpike | Guardrail > 10回/分 | セキュリティ異常 |
 
-1. ダッシュボード画面で **+** (Add widget) をクリック
-2. **Line** を選択
-3. **Custom namespaces** → **AgenticAI/CustomerSupport** → **AgentName**
-4. `orchestrator` の `Latency_P50`, `Latency_P95`, `Latency_P99` を選択
-5. **Graphed metrics** タブ：
-   - **Statistic**: `Average`
-   - **Period**: `1 minute`
+### ステップ 2.4: アラーム設計の考え方
+
+| 観点 | 設計ポイント |
+|------|------------|
+| 閾値 | ベースライン + 余裕（ノイズ回避） |
+| 評価期間 | 一時的なスパイクを除外（2-3 データポイント） |
+| アクション | 本番では SNS → PagerDuty / Slack 連携 |
+| Missing data | `notBreaching`（データなし = 正常扱い） |
+
+### ステップ 2.5: （参考）手動でダッシュボードを作成する場合
+
+1. CloudWatch コンソールで **Dashboards** → **Create dashboard**
+2. **Dashboard name** を入力して **Create dashboard**
+3. **Add widget** で **Line** を選択し **Next**
+4. **Custom namespaces** → **AgenticAI/CustomerSupport** → **AgentName** からメトリクスを選択
+5. **Graphed metrics** タブで **Statistic**（Sum/Average）と **Period**（1min/5min）を設定
 6. **Create widget** をクリック
+7. ウィジェットを追加する場合は **+** ボタンで繰り返し
+8. 最後に **Save** をクリック
 
-### ステップ 2.5: ウィジェットの追加 - トークン消費量
+### ステップ 2.6: （参考）手動でアラームを作成する場合
 
-1. **+** → **Line** を選択
-2. `orchestrator` の `InputTokens`, `OutputTokens` を選択
-3. **Statistic**: `Sum`, **Period**: `5 minutes`
-4. **Create widget** をクリック
-
-### ステップ 2.6: ウィジェットの追加 - エラー率
-
-1. **+** → **Number** を選択
-2. `orchestrator` の `ErrorRate` を選択
-3. **Statistic**: `Average`, **Period**: `5 minutes`
-4. **Create widget** をクリック
-
-### ステップ 2.7: ダッシュボードの保存
-
-1. 画面右上の **Save** をクリック
-2. ウィジェットをドラッグ & リサイズして見やすくレイアウト調整
-3. 再度 **Save** をクリック
-
-### ステップ 2.8: アラームの作成（コンソール）
-
-**高レイテンシーアラーム:**
-
-1. CloudWatch コンソールの左メニューから **Alarms** → **All alarms** を選択
-2. **Create alarm** をクリック
-3. **Select metric** をクリック
-4. **Custom namespaces** → **AgenticAI/CustomerSupport** → **AgentName** → `orchestrator` の `Latency_P95` を選択
-5. **Select metric** をクリック
-6. **Conditions** を設定：
+1. CloudWatch コンソールで **Alarms** → **All alarms** → **Create alarm**
+2. **Select metric** → **Custom namespaces** → **AgenticAI/CustomerSupport** → **AgentName**
+3. 対象メトリクス（例: `Latency_P95`）を選択して **Select metric**
+4. **Conditions** を設定：
    - **Threshold type**: Static
-   - **Whenever Latency_P95 is...**: Greater than
-   - **than...**: `10000`（10秒 = 10000ms）
-7. **Next** をクリック
-8. **Notification** セクション：
-   - 今回は **Remove** で通知をスキップ（本番では SNS トピックを設定）
-9. **Next** をクリック
-10. **Alarm name**: `AgenticAI-HighLatency-P95`
-11. **Description**: `P95 レイテンシーが 10 秒を超過`
-12. **Create alarm** をクリック
-
-**高エラー率アラーム:**
-
-同様の手順で以下を作成：
-- **Metric**: `ErrorRate` (orchestrator)
-- **Condition**: Greater than `5`
-- **Alarm name**: `AgenticAI-HighErrorRate`
-- **Description**: `エラー率が 5% を超過`
+   - **Whenever metric is...**: Greater than
+   - **than...**: 閾値を入力（例: `10000`）
+5. **Next** → **Notification** を設定（本番では SNS トピックを指定）
+6. **Next** → **Alarm name** と **Description** を入力
+7. **Create alarm** をクリック
 
 ---
 
