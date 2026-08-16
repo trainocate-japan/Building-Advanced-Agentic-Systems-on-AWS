@@ -76,13 +76,17 @@ when {
 2. **Description**: `エージェンティック AI システム向けセキュリティガードレール`
 3. **Messaging for blocked prompts**: `申し訳ありませんが、このリクエストにはお答えできません。別のご質問をお願いします。`
 4. **Apply the same blocked message for responses** にチェック
-5. **Next** をクリック
+5. **Cross-Region inference**（クロスリージョン推論）を展開：
+   - **Enable cross-Region inference for your guardrail** にチェックを入れる
+   - ガードレールプロファイルを選択（日本語対応に必要）
+6. **Next** をクリック
 
 ### ステップ 3.3: コンテンツフィルターの設定
 
 **Configure content filters** ページで以下を設定：
 
-1. **Enable harmful content filters** を ON にする
+1. **フィルターティア**: **Standard** を選択（日本語テキストのフィルタリングに必要）
+2. **Enable harmful content filters** を ON にする
 2. 以下のカテゴリすべてで Input/Output 両方の強度を **High** に設定：
 
    | カテゴリ | Input Strength | Output Strength |
