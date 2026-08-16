@@ -17,7 +17,17 @@ cd ~/handson/M04-observability-evaluation
 | **トレースレベル** | エージェント実行全体 | 全体レイテンシー、総トークン数、成功/失敗 |
 | **スパンレベル** | 個々のステップ | LLM 呼び出し時間、ツール実行時間、各ステップのトークン数 |
 
-### ステップ 1.3: トレーシングデモの実行
+### ステップ 1.3: CloudWatch Transaction Search の有効化（初回のみ）
+
+AgentCore Observability を使用するためには、CloudWatch Transaction Search を有効化する必要があります（アカウントごとに 1 回）。
+
+1. AWS コンソールで **CloudWatch** を開く
+2. 左ナビゲーションペインの **Settings** を選択
+3. **Transaction Search** セクションを確認
+4. 有効になっていない場合は **Enable** をクリック
+5. 有効化が完了するまで数分待機
+
+### ステップ 1.4: トレーシングデモの実行
 
 ADOT SDK 経由で実行するため、ラッパースクリプトを使います：
 
