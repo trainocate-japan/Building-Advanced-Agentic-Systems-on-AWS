@@ -249,20 +249,29 @@ def main():
         f"/.well-known/openid-configuration"
     )
 
-    resp = agentcore_client.create_oauth2_credential_provider(
-        name=CREDENTIAL_PROVIDER_NAME,
-        credentialProviderVendor="CustomOauth2",
-        oauth2ProviderConfigInput={
-            "customOauth2ProviderConfig": {
-                "oauthDiscovery": {"discoveryUrl": issuer_url},
-                "clientId": client_id_3lo,
-                "clientSecret": client_secret_3lo,
-            }
-        },
-    )
-    callback_url = resp.get("callbackUrl", "N/A")
-    provider_arn = resp.get("credentialProviderArn", "N/A")
-    print_success(f"Credential Provider: {CREDENTIAL_PROVIDER_NAME}")
+    try:
+        resp = agentcore_client.create_oauth2_credential_provider(
+            name=CREDENTIAL_PROVIDER_NAME,
+            credentialProviderVendor="CustomOauth2",
+            oauth2ProviderConfigInput={
+                "customOauth2ProviderConfig": {
+                    "oauthDiscovery": {"discoveryUrl": issuer_url},
+                    "clientId": client_id_3lo,
+                    "clientSecret": client_secret_3lo,
+                }
+            },
+        )
+        callback_url = resp.get("callbackUrl", "N/A")
+        provider_arn = resp.get("credentialProviderArn", "N/A")
+        print_success(f"Credential Provider 作成: {CREDENTIAL_PROVIDER_NAME}")
+    except Exception as e:
+        if "already exists" in str(e) or "ValidationException" in str(type(e).__name__):
+            resp = agentcore_client.get_oauth2_credential_provider(name=CREDENTIAL_PROVIDER_NAME)
+            callback_url = resp.get("callbackUrl", "N/A")
+            provider_arn = resp.get("credentialProviderArn", "N/A")
+            print_success(f"Credential Provider 既存（スキップ）: {CREDENTIAL_PROVIDER_NAME}")
+        else:
+            raise
     print_info("Callback URL", callback_url)
 
     # 3LO クライアントに Callback URL 登録
@@ -479,12 +488,35 @@ def handler(event, context):
     # =========================================================================
     print_step(7, "Policy Engine 作成")
 
-    resp = agentcore_client.create_policy_engine(
-        name=POLICY_ENGINE_NAME,
-        description="AgentCore ハンズオン用 Policy Engine",
-    )
-    policy_engine_id = resp["policyEngineId"]
-    policy_engine_arn = resp["policyEngineArn"]
+    try:
+        resp = agentcore_client.create_policy_engine(
+            name=POLICY_ENGINE_NAME,
+            description="AgentCore ハンズオン用 Policy Engine",
+        )
+        policy_engine_id = resp["policyEngineId"]
+        policy_engine_arn = resp["policyEngineArn"]
+        print_success(f"Policy Engine 作成: {policy_engine_id}")
+    except agentcore_client.exceptions.ConflictException:
+        # 既存を取得
+        engines = agentcore_client.list_policy_engines()
+        for e in engines.get("items", []):
+            if e.get("name") == POLICY_ENGINE_NAME:
+                policy_engine_id = e["policyEngineId"]
+                policy_engine_arn = e["policyEngineArn"]
+                break
+        print_success(f"Policy Engine 既存（スキップ）: {policy_engine_id}")
+    except Exception as e:
+        if "ConflictException" in str(type(e).__name__) or "already exists" in str(e):
+            engines = agentcore_client.list_policy_engines()
+            for eng in engines.get("items", []):
+                if eng.get("name") == POLICY_ENGINE_NAME:
+                    policy_engine_id = eng["policyEngineId"]
+                    policy_engine_arn = eng["policyEngineArn"]
+                    break
+            print_success(f"Policy Engine 既存（スキップ）: {policy_engine_id}")
+        else:
+            raise
+
     print_info("Policy Engine ID", policy_engine_id)
     print_info("Policy Engine ARN", policy_engine_arn)
 
@@ -504,25 +536,39 @@ def handler(event, context):
 
     discovery_url = f"https://cognito-idp.{REGION}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration"
 
-    resp = agentcore_client.create_gateway(
-        name=GATEWAY_NAME,
-        protocolType="MCP",
-        authorizerType="CUSTOM_JWT",
-        authorizerConfiguration={
-            "customJWTAuthorizer": {
-                "discoveryUrl": discovery_url,
-                "allowedClients": [client_id_2lo, client_id_3lo],
-            }
-        },
-        roleArn=gateway_role_arn,
-        policyEngineConfiguration={
-            "mode": "ENFORCE",
-            "arn": policy_engine_arn,
-        },
-    )
-    gateway_id = resp.get("gatewayId", "N/A")
-    gateway_arn = resp.get("gatewayArn", "N/A")
-    gateway_url = resp.get("gatewayUrl", "N/A")
+    try:
+        resp = agentcore_client.create_gateway(
+            name=GATEWAY_NAME,
+            protocolType="MCP",
+            authorizerType="CUSTOM_JWT",
+            authorizerConfiguration={
+                "customJWTAuthorizer": {
+                    "discoveryUrl": discovery_url,
+                    "allowedClients": [client_id_2lo, client_id_3lo],
+                }
+            },
+            roleArn=gateway_role_arn,
+            policyEngineConfiguration={
+                "mode": "ENFORCE",
+                "arn": policy_engine_arn,
+            },
+        )
+        gateway_id = resp.get("gatewayId", "N/A")
+        gateway_arn = resp.get("gatewayArn", "N/A")
+        gateway_url = resp.get("gatewayUrl", "N/A")
+        print_success(f"Gateway 作成: {gateway_id}")
+    except Exception as e:
+        if "ConflictException" in str(type(e).__name__) or "already exists" in str(e):
+            gateways = agentcore_client.list_gateways()
+            for gw in gateways.get("items", []):
+                if gw.get("name") == GATEWAY_NAME:
+                    gateway_id = gw["gatewayId"]
+                    gateway_arn = gw.get("gatewayArn", f"arn:aws:bedrock-agentcore:{REGION}:{account_id}:gateway/{gateway_id}")
+                    gateway_url = gw.get("gatewayUrl", "N/A")
+                    break
+            print_success(f"Gateway 既存（スキップ）: {gateway_id}")
+        else:
+            raise
     print_info("Gateway ID", gateway_id)
     print_info("Gateway ARN", gateway_arn)
     print_info("Gateway URL", gateway_url)
@@ -568,22 +614,34 @@ def handler(event, context):
         },
     ]
 
-    resp = agentcore_client.create_gateway_target(
-        gatewayIdentifier=gateway_id,
-        name="handson-tools",
-        description="ハンズオン用ツール（返金処理 + 注文確認）",
-        targetConfiguration={
-            "mcp": {
-                "lambda": {
-                    "lambdaArn": lambda_arn,
-                    "toolSchema": {
-                        "inlinePayload": tool_schema,
-                    },
+    try:
+        resp = agentcore_client.create_gateway_target(
+            gatewayIdentifier=gateway_id,
+            name="handson-tools",
+            description="ハンズオン用ツール（返金処理 + 注文確認）",
+            targetConfiguration={
+                "mcp": {
+                    "lambda": {
+                        "lambdaArn": lambda_arn,
+                        "toolSchema": {
+                            "inlinePayload": tool_schema,
+                        },
+                    }
                 }
-            }
-        },
-    )
-    target_id = resp.get("targetId", "N/A")
+            },
+        )
+        target_id = resp.get("targetId", "N/A")
+        print_success(f"Gateway Target 作成: {target_id}")
+    except Exception as e:
+        if "ConflictException" in str(type(e).__name__) or "already exists" in str(e):
+            targets = agentcore_client.list_gateway_targets(gatewayIdentifier=gateway_id)
+            for t in targets.get("items", []):
+                if t.get("name") == "handson-tools":
+                    target_id = t["targetId"]
+                    break
+            print_success(f"Gateway Target 既存（スキップ）: {target_id}")
+        else:
+            raise
     print_info("Target ID", target_id)
 
     # READY になるまで待機
@@ -622,24 +680,36 @@ def handler(event, context):
     print_info("Policy 2", "process_refund: 500 USD 未満のみ許可")
 
     # Policy 1 作成
-    resp1 = agentcore_client.create_policy(
-        name="allow-order-status",
-        description="注文ステータス確認は全ユーザーに許可",
-        policyEngineId=policy_engine_id,
-        definition={"cedar": {"statement": cedar_allow_read}},
-        enforcementMode="ACTIVE",
-    )
-    print_success(f"Policy 'allow-order-status' 作成: {resp1.get('policyId', 'N/A')}")
+    try:
+        resp1 = agentcore_client.create_policy(
+            name="allow_order_status",
+            description="注文ステータス確認は全ユーザーに許可",
+            policyEngineId=policy_engine_id,
+            definition={"cedar": {"statement": cedar_allow_read}},
+            enforcementMode="ACTIVE",
+        )
+        print_success(f"Policy 'allow_order_status' 作成: {resp1.get('policyId', 'N/A')}")
+    except Exception as e:
+        if "already exists" in str(e) or "Conflict" in str(e):
+            print_success("Policy 'allow_order_status' 既存（スキップ）")
+        else:
+            raise
 
     # Policy 2 作成
-    resp2 = agentcore_client.create_policy(
-        name="limit-refund-amount",
-        description="返金は500USD未満のみ許可",
-        policyEngineId=policy_engine_id,
-        definition={"cedar": {"statement": cedar_refund_limit}},
-        enforcementMode="ACTIVE",
-    )
-    print_success(f"Policy 'limit-refund-amount' 作成: {resp2.get('policyId', 'N/A')}")
+    try:
+        resp2 = agentcore_client.create_policy(
+            name="limit_refund_amount",
+            description="返金は500USD未満のみ許可",
+            policyEngineId=policy_engine_id,
+            definition={"cedar": {"statement": cedar_refund_limit}},
+            enforcementMode="ACTIVE",
+        )
+        print_success(f"Policy 'limit_refund_amount' 作成: {resp2.get('policyId', 'N/A')}")
+    except Exception as e:
+        if "already exists" in str(e) or "Conflict" in str(e):
+            print_success("Policy 'limit_refund_amount' 既存（スキップ）")
+        else:
+            raise
     print_end()
 
     # =========================================================================
