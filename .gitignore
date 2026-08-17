@@ -91,3 +91,6 @@ demo/
 *.pdf
 *.html
 *.xlsx
+
+# Handson generated config
+identity_config.json

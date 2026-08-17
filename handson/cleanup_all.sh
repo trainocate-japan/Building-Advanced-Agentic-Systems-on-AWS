@@ -67,6 +67,15 @@ else
     echo "  ─ Cognito User Pool なし（スキップ）"
 fi
 
+# Identity 設定ファイルの削除
+IDENTITY_CONFIG="$HOME/handson/M03-security-compliance/identity_config.json"
+if [ -f "$IDENTITY_CONFIG" ]; then
+    rm -f "$IDENTITY_CONFIG"
+    echo "  ✅ 設定ファイル削除: identity_config.json"
+else
+    echo "  ─ identity_config.json なし（スキップ）"
+fi
+
 # Bedrock Guardrail の削除
 echo "  Guardrail の削除..."
 GUARDRAIL_ID=$(aws bedrock list-guardrails --region "$REGION" \
