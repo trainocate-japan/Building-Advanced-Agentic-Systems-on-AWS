@@ -35,6 +35,38 @@ echo "────────────────────────�
 echo " [M03] セキュリティ関連リソースの削除"
 echo "──────────────────────────────────────────────"
 
+# AgentCore Credential Provider の削除
+echo "  AgentCore Credential Provider の削除..."
+PROVIDER_NAME="AgentCoreHandsonProvider"
+aws bedrock-agentcore-control delete-oauth2-credential-provider \
+    --name "$PROVIDER_NAME" --region "$REGION" 2>/dev/null && \
+    echo "  ✅ Credential Provider 削除: $PROVIDER_NAME" || \
+    echo "  ─ Credential Provider なし（スキップ）"
+
+# Cognito User Pool の削除 (AgentCore Identity デモ用)
+echo "  Cognito User Pool の削除..."
+POOL_ID=$(aws cognito-idp list-user-pools --max-results 20 --region "$REGION" \
+    --query "UserPools[?Name=='AgentCoreIdentityHandsonPool'].Id" \
+    --output text 2>/dev/null || echo "")
+
+if [ -n "$POOL_ID" ] && [ "$POOL_ID" != "None" ]; then
+    # ドメイン削除（User Pool 削除前に必要）
+    DOMAIN=$(aws cognito-idp describe-user-pool --user-pool-id "$POOL_ID" --region "$REGION" \
+        --query "UserPool.Domain" --output text 2>/dev/null || echo "")
+    if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "None" ]; then
+        aws cognito-idp delete-user-pool-domain \
+            --domain "$DOMAIN" --user-pool-id "$POOL_ID" --region "$REGION" 2>/dev/null && \
+            echo "  ✅ Cognito ドメイン削除: $DOMAIN" || \
+            echo "  ⚠️  ドメイン削除失敗"
+    fi
+    # User Pool 削除
+    aws cognito-idp delete-user-pool --user-pool-id "$POOL_ID" --region "$REGION" 2>/dev/null && \
+        echo "  ✅ User Pool 削除: $POOL_ID" || \
+        echo "  ⚠️  User Pool 削除失敗（手動で確認してください）"
+else
+    echo "  ─ Cognito User Pool なし（スキップ）"
+fi
+
 # Bedrock Guardrail の削除
 echo "  Guardrail の削除..."
 GUARDRAIL_ID=$(aws bedrock list-guardrails --region "$REGION" \
@@ -141,6 +173,8 @@ echo " クリーンアップ完了!"
 echo "=============================================="
 echo ""
 echo "  削除されたリソース:"
+echo "  - AgentCore Credential Provider (AgentCoreHandsonProvider)"
+echo "  - Cognito User Pool (AgentCoreIdentityHandsonPool)"
 echo "  - Bedrock Guardrail (agentic-security-guardrail)"
 echo "  - CloudWatch ダッシュボード (AgenticAI-Observability)"
 echo "  - CloudWatch アラーム (AgenticAI-* )"

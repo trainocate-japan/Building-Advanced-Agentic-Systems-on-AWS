@@ -317,47 +317,6 @@ def verify_resources(agentcore_client, cognito_client, cognito_info):
 
 
 # =============================================================================
-# Step 5: クリーンアップ
-# =============================================================================
-
-def cleanup(agentcore_client, cognito_client, cognito_info):
-    """作成したリソースを削除"""
-
-    print_step(5, "クリーンアップ（リソース削除）")
-
-    # Credential Provider 削除
-    print_info("アクション", "Credential Provider を削除中...")
-    try:
-        agentcore_client.delete_oauth2_credential_provider(
-            name=CREDENTIAL_PROVIDER_NAME
-        )
-        print_success("Credential Provider 削除完了")
-    except Exception as e:
-        print_error(f"Credential Provider 削除失敗: {e}")
-
-    # Cognito ドメイン削除
-    print_info("アクション", "Cognito ドメインを削除中...")
-    try:
-        cognito_client.delete_user_pool_domain(
-            Domain=cognito_info["domain_name"],
-            UserPoolId=cognito_info["user_pool_id"],
-        )
-        print_success("ドメイン削除完了")
-    except Exception as e:
-        print_error(f"ドメイン削除失敗: {e}")
-
-    # Cognito User Pool 削除（クライアントとユーザーも一緒に削除される）
-    print_info("アクション", "Cognito User Pool を削除中...")
-    try:
-        cognito_client.delete_user_pool(UserPoolId=cognito_info["user_pool_id"])
-        print_success("User Pool 削除完了（クライアント・ユーザーも同時に削除）")
-    except Exception as e:
-        print_error(f"User Pool 削除失敗: {e}")
-
-    print_end()
-
-
-# =============================================================================
 # アーキテクチャ解説
 # =============================================================================
 
@@ -414,14 +373,13 @@ def main():
     print("    2. AgentCore OAuth2 Credential Provider")
     print("    3. Callback URL の登録")
     print("    4. リソースの確認")
-    print("    5. クリーンアップ")
+    print()
+    print("  ※ クリーンアップは cleanup_all.sh で一括実行してください")
     print()
 
     # クライアント初期化
     cognito_client = boto3.client("cognito-idp", region_name=REGION)
     agentcore_client = boto3.client("bedrock-agentcore-control", region_name=REGION)
-
-    cognito_info = None
 
     try:
         # Step 1: Cognito User Pool 作成
@@ -445,11 +403,6 @@ def main():
         print()
         import traceback
         traceback.print_exc()
-
-    finally:
-        # Step 5: クリーンアップ
-        if cognito_info:
-            cleanup(agentcore_client, cognito_client, cognito_info)
 
     print_header("デモ完了")
     print("  [Key Takeaways]")
