@@ -141,6 +141,18 @@ Resources:
                   - logs:DeleteLogStream
                   - logs:DescribeLogGroups
                 Resource: '*'
+        - PolicyName: CognitoAndSecretsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - secretsmanager:*
+                Resource: '*'
 
   DemoInstanceProfile:
     Type: AWS::IAM::InstanceProfile

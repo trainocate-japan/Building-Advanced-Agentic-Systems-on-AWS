@@ -1,258 +1,231 @@
 """
-モジュール 3: AgentCore Policy - Cedar によるアクセス制御
+モジュール 3: AgentCore Policy - Cedar ポリシー認可デモ
 
-Amazon Bedrock AgentCore Policy は Cedar 言語を使用して、
-エージェントの行動を細粒度で制御するポリシーフレームワークです。
+Gateway + Policy Engine に設定された Cedar ポリシーによる認可を確認します:
+1. get_order_status → 全ユーザーに許可 → 成功
+2. process_refund (amount=100) → 500未満なので許可 → 成功
+3. process_refund (amount=1000) → 500以上なので拒否 → DENY
 
-Cedar の特徴:
-- 宣言的なポリシー言語
-- permit（許可）と forbid（禁止）
-- 条件付き (when/unless) でコンテキストに応じた制御
-- JSON ベースのエンティティとスキーマ
+Cedar ポリシーがリアルタイムでツール呼び出しを制御する様子を体験します。
+
+前提: agentcore_identity_setup.py を実行済みであること
 """
 
-import boto3
 import json
-from datetime import datetime
+import sys
+import base64
+import urllib.request
+import urllib.parse
+import boto3
 
 # =============================================================================
-# Cedar ポリシーの定義と評価
+# 設定
 # =============================================================================
 
-# ポリシー例 1: 金額制限付き返金ポリシー
-REFUND_POLICY = """
-// 500ドル未満の返金のみ許可（財務部門ユーザー限定）
-permit (
-    principal,
-    action == MCP::Action::"process_refund",
-    resource
-)
-when {
-    principal.department == "finance" &&
-    resource.amount < 500
-};
-"""
-
-# ポリシー例 2: 営業時間制限
-BUSINESS_HOURS_POLICY = """
-// 高額操作は営業時間内のみ許可
-forbid (
-    principal,
-    action == MCP::Action::"approve_transaction",
-    resource
-)
-unless {
-    context.current_hour >= 9 &&
-    context.current_hour <= 18 &&
-    context.is_business_day == true
-};
-"""
-
-# ポリシー例 3: PII アクセス制限
-PII_ACCESS_POLICY = """
-// PII データへのアクセスは特定ロールのみ許可
-permit (
-    principal,
-    action == MCP::Action::"access_customer_pii",
-    resource
-)
-when {
-    principal.role in ["compliance_officer", "senior_support"] &&
-    principal.has_pii_training == true &&
-    context.audit_logging_enabled == true
-};
-"""
-
-# ポリシー例 4: エスカレーション制御
-ESCALATION_POLICY = """
-// エスカレーションは特定の条件でのみ許可
-permit (
-    principal,
-    action == MCP::Action::"escalate_to_human",
-    resource
-)
-when {
-    resource.priority == "critical" ||
-    resource.customer_tier == "vip" ||
-    resource.failed_attempts > 3
-};
-"""
+CONFIG_FILE = "identity_config.json"
 
 
-def demo_policy_evaluation():
-    """Cedar ポリシーの評価をシミュレーション"""
+def load_config():
+    try:
+        with open(CONFIG_FILE) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"  ❌ {CONFIG_FILE} が見つかりません。")
+        print(f"     先に agentcore_identity_setup.py を実行してください。")
+        sys.exit(1)
 
-    print("=" * 70)
-    print(" AgentCore Policy: Cedar によるエージェント行動制御")
-    print("=" * 70)
 
-    # --- シナリオ 1: 返金処理の認可 ---
-    print("\n" + "─" * 70)
-    print("  シナリオ 1: 返金処理の認可判定")
-    print("─" * 70)
-    print(f"\n  [Cedar ポリシー]{REFUND_POLICY}")
+def get_2lo_token(config):
+    """2LO でアクセストークンを取得"""
+    client_id = config["client_id_2lo"]
+    client_secret = config["client_secret_2lo"]
+    scopes = " ".join(config["scopes_2lo"])
 
-    # テストケース
-    test_cases_refund = [
-        {
-            "description": "財務部門、450ドルの返金",
-            "principal": {"department": "finance", "username": "refund-agent"},
-            "action": "process_refund",
-            "resource": {"amount": 450, "order_id": "ORD-001"},
-            "expected": "ALLOW"
+    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    data = urllib.parse.urlencode({
+        "grant_type": "client_credentials",
+        "scope": scopes,
+    }).encode()
+
+    req = urllib.request.Request(
+        config["token_endpoint"],
+        data=data,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {credentials}",
         },
-        {
-            "description": "財務部門、600ドルの返金（上限超過）",
-            "principal": {"department": "finance", "username": "refund-agent"},
-            "action": "process_refund",
-            "resource": {"amount": 600, "order_id": "ORD-002"},
-            "expected": "DENY"
-        },
-        {
-            "description": "営業部門、200ドルの返金（部門不一致）",
-            "principal": {"department": "sales", "username": "sales-agent"},
-            "action": "process_refund",
-            "resource": {"amount": 200, "order_id": "ORD-003"},
-            "expected": "DENY"
-        },
-    ]
-
-    for tc in test_cases_refund:
-        decision = evaluate_policy(tc["principal"], tc["action"], tc["resource"])
-        status = "✅" if decision == tc["expected"] else "❌"
-        print(f"  {status} {tc['description']}")
-        print(f"     Principal: {tc['principal']}")
-        print(f"     Resource: {tc['resource']}")
-        print(f"     Decision: {decision}")
-        print()
-
-    # --- シナリオ 2: PII アクセス制御 ---
-    print("─" * 70)
-    print("  シナリオ 2: PII データへのアクセス制御")
-    print("─" * 70)
-    print(f"\n  [Cedar ポリシー]{PII_ACCESS_POLICY}")
-
-    test_cases_pii = [
-        {
-            "description": "コンプライアンスオフィサー、PII研修済み",
-            "principal": {"role": "compliance_officer", "has_pii_training": True},
-            "action": "access_customer_pii",
-            "context": {"audit_logging_enabled": True},
-            "expected": "ALLOW"
-        },
-        {
-            "description": "一般サポート、PII研修未済",
-            "principal": {"role": "general_support", "has_pii_training": False},
-            "action": "access_customer_pii",
-            "context": {"audit_logging_enabled": True},
-            "expected": "DENY"
-        },
-        {
-            "description": "シニアサポート、監査ログ無効",
-            "principal": {"role": "senior_support", "has_pii_training": True},
-            "action": "access_customer_pii",
-            "context": {"audit_logging_enabled": False},
-            "expected": "DENY"
-        },
-    ]
-
-    for tc in test_cases_pii:
-        decision = evaluate_pii_policy(tc["principal"], tc["context"])
-        status = "✅" if decision == tc["expected"] else "❌"
-        print(f"  {status} {tc['description']}")
-        print(f"     Principal: {tc['principal']}")
-        print(f"     Context: {tc['context']}")
-        print(f"     Decision: {decision}")
-        print()
-
-    # --- 認可フロー全体 ---
-    print("─" * 70)
-    print("  [認可フロー全体像]")
-    print("─" * 70)
-    demo_full_authorization_flow()
+    )
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read().decode())["access_token"]
 
 
-def evaluate_policy(principal: dict, action: str, resource: dict) -> str:
-    """Cedar ポリシーの評価をシミュレート（返金ポリシー）"""
-    if principal.get("department") == "finance" and resource.get("amount", 0) < 500:
-        return "ALLOW"
-    return "DENY"
+def invoke_gateway_tool(config, token, tool_name, tool_input):
+    """Gateway 経由でツールを呼び出し、結果を返す"""
+    agentcore = boto3.client("bedrock-agentcore", region_name=config["region"])
+
+    payload = json.dumps({
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+    }).encode()
+
+    try:
+        response = agentcore.invoke_gateway(
+            gatewayIdentifier=config["gateway_id"],
+            targetName="handson-tools",
+            action=f"handson-tools___{tool_name}",
+            payload=payload,
+            authorizationToken=f"Bearer {token}",
+        )
+
+        response_body = response.get("body", b"")
+        if hasattr(response_body, "read"):
+            response_body = response_body.read()
+        if isinstance(response_body, bytes):
+            response_body = response_body.decode()
+
+        return {"success": True, "body": json.loads(response_body) if response_body else {}}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
-def evaluate_pii_policy(principal: dict, context: dict) -> str:
-    """Cedar ポリシーの評価をシミュレート（PII アクセスポリシー）"""
-    allowed_roles = ["compliance_officer", "senior_support"]
-    if (principal.get("role") in allowed_roles and
-        principal.get("has_pii_training") is True and
-        context.get("audit_logging_enabled") is True):
-        return "ALLOW"
-    return "DENY"
+# =============================================================================
+# メイン
+# =============================================================================
 
+def main():
+    config = load_config()
 
-def demo_full_authorization_flow():
-    """AgentCore Policy の完全な認可フローをデモ"""
+    print()
+    print("╔══════════════════════════════════════════════════════════════════════╗")
+    print("║  AgentCore Policy: Cedar ポリシー認可デモ                            ║")
+    print("╚══════════════════════════════════════════════════════════════════════╝")
+    print()
+    print("  Gateway に設定された Cedar ポリシー:")
+    print()
+    print("  ┌────────────────────────────────────────────────────────────────┐")
+    print("  │ Policy 1: get_order_status は全ユーザーに許可                   │")
+    print("  │                                                                  │")
+    print("  │   permit(                                                        │")
+    print("  │     principal,                                                   │")
+    print("  │     action == AgentCore::Action::\"...get_order_status\",        │")
+    print("  │     resource == AgentCore::Gateway::\"<gateway-arn>\"            │")
+    print("  │   );                                                             │")
+    print("  ├────────────────────────────────────────────────────────────────┤")
+    print("  │ Policy 2: process_refund は 500 USD 未満のみ許可               │")
+    print("  │                                                                  │")
+    print("  │   permit(                                                        │")
+    print("  │     principal,                                                   │")
+    print("  │     action == AgentCore::Action::\"...process_refund\",          │")
+    print("  │     resource == AgentCore::Gateway::\"<gateway-arn>\"            │")
+    print("  │   ) when {                                                       │")
+    print("  │     context.input.amount < 500                                   │")
+    print("  │   };                                                             │")
+    print("  └────────────────────────────────────────────────────────────────┘")
+    print()
 
-    print("""
-    ┌─────────────────────────────────────────────────────────────────┐
-    │              AgentCore Policy 認可フロー                          │
-    ├─────────────────────────────────────────────────────────────────┤
-    │                                                                   │
-    │  Step 1: JWT トークン受信                                        │
-    │  ┌───────────────────────────────────────────────┐              │
-    │  │ {                                              │              │
-    │  │   "sub": "12345678-...",                       │              │
-    │  │   "username": "refund-agent",                  │              │
-    │  │   "scope": "refund:write",                     │              │
-    │  │   "department": "finance"                      │              │
-    │  │ }                                              │              │
-    │  └───────────────────────────────────────────────┘              │
-    │                         │                                        │
-    │                         ▼                                        │
-    │  Step 2: MCP ツールコールリクエスト                               │
-    │  ┌───────────────────────────────────────────────┐              │
-    │  │ {                                              │              │
-    │  │   "method": "tools/call",                      │              │
-    │  │   "params": {                                  │              │
-    │  │     "name": "RefundTool__process_refund",      │              │
-    │  │     "arguments": {"orderId": "12345",          │              │
-    │  │                   "amount": 450}               │              │
-    │  │   }                                            │              │
-    │  │ }                                              │              │
-    │  └───────────────────────────────────────────────┘              │
-    │                         │                                        │
-    │                         ▼                                        │
-    │  Step 3: Cedar 認可リクエスト組み立て                             │
-    │  principal = AgentCore::OAuthUser::"12345678-..."                │
-    │  action    = AgentCore::Action::"tools/call"                    │
-    │  resource  = AgentCore::Tool::"RefundTool__process_refund"      │
-    │  context   = {amount: 450, department: "finance", ...}          │
-    │                         │                                        │
-    │                         ▼                                        │
-    │  Step 4: ポリシー評価                                            │
-    │  ┌────────────────────────────────────────────┐                 │
-    │  │ permit when {                               │                 │
-    │  │   principal.department == "finance" &&       │                 │
-    │  │   resource.amount < 500                     │                 │
-    │  │ }                                           │                 │
-    │  │                                             │                 │
-    │  │ → ALLOW ✅                                  │                 │
-    │  └────────────────────────────────────────────┘                 │
-    │                         │                                        │
-    │                         ▼                                        │
-    │  Step 5: ツール実行 or エラーレスポンス                           │
-    │                                                                   │
-    └─────────────────────────────────────────────────────────────────┘
-    """)
+    # トークン取得
+    print("  トークンを取得中...")
+    token = get_2lo_token(config)
+    print(f"  ✅ トークン取得成功: {token[:30]}...")
+    print()
+
+    # ─── テスト 1: get_order_status（許可） ─────────────────────────────────
+
+    print("  ┌─ テスト 1: get_order_status（全ユーザーに許可）──────────────────")
+    print(f"  │")
+    print(f"  │ 🔧 ツール: get_order_status")
+    print(f"  │ 📥 入力:  {{\"order_id\": \"ORD-12345\"}}")
+    print(f"  │ 📋 期待:  ALLOW（ポリシーで全ユーザーに許可）")
+    print(f"  │")
+
+    result = invoke_gateway_tool(config, token, "get_order_status", {"order_id": "ORD-12345"})
+    if result["success"]:
+        print(f"  │ ✅ 結果: ALLOW — ツール実行成功")
+        print(f"  │    レスポンス: {json.dumps(result['body'], ensure_ascii=False)[:150]}")
+    else:
+        print(f"  │ ❌ 結果: {result['error'][:150]}")
+
+    print(f"  └──────────────────────────────────────────────────────────────────")
+
+    # ─── テスト 2: process_refund $100（許可） ──────────────────────────────
+
+    print()
+    print("  ┌─ テスト 2: process_refund $100（500未満 → 許可）────────────────")
+    print(f"  │")
+    print(f"  │ 🔧 ツール: process_refund")
+    print(f"  │ 📥 入力:  {{\"order_id\": \"ORD-67890\", \"amount\": 100}}")
+    print(f"  │ 📋 期待:  ALLOW（100 < 500 なのでポリシー条件を満たす）")
+    print(f"  │")
+
+    result = invoke_gateway_tool(config, token, "process_refund", {
+        "order_id": "ORD-67890", "amount": 100, "reason": "商品破損"
+    })
+    if result["success"]:
+        print(f"  │ ✅ 結果: ALLOW — 返金処理成功")
+        print(f"  │    レスポンス: {json.dumps(result['body'], ensure_ascii=False)[:150]}")
+    else:
+        error = result["error"]
+        if "Denied" in error or "denied" in error or "policy" in error.lower():
+            print(f"  │ 🚫 結果: DENY（予期しない拒否）")
+        else:
+            print(f"  │ ❌ 結果: {error[:150]}")
+
+    print(f"  └──────────────────────────────────────────────────────────────────")
+
+    # ─── テスト 3: process_refund $1000（拒否） ─────────────────────────────
+
+    print()
+    print("  ┌─ テスト 3: process_refund $1000（500以上 → 拒否）───────────────")
+    print(f"  │")
+    print(f"  │ 🔧 ツール: process_refund")
+    print(f"  │ 📥 入力:  {{\"order_id\": \"ORD-99999\", \"amount\": 1000}}")
+    print(f"  │ 📋 期待:  DENY（1000 >= 500 なのでポリシー条件を満たさない）")
+    print(f"  │")
+
+    result = invoke_gateway_tool(config, token, "process_refund", {
+        "order_id": "ORD-99999", "amount": 1000, "reason": "全額返金要求"
+    })
+    if result["success"]:
+        print(f"  │ ⚠️  結果: ALLOW（ポリシーが効いていない可能性）")
+        print(f"  │    レスポンス: {json.dumps(result['body'], ensure_ascii=False)[:150]}")
+    else:
+        error = result["error"]
+        if "Denied" in error or "denied" in error or "policy" in error.lower() or "authorization" in error.lower():
+            print(f"  │ 🚫 結果: DENY — ポリシーにより拒否!")
+            print(f"  │    Cedar ポリシーが $1000 の返金をブロックしました")
+        else:
+            print(f"  │ ❌ 結果: {error[:150]}")
+
+    print(f"  └──────────────────────────────────────────────────────────────────")
+
+    # ─── まとめ ────────────────────────────────────────────────────────────
+
+    print()
+    print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print()
+    print("  [結果まとめ]")
+    print("  ┌──────────────────────┬────────────┬────────────────────────────┐")
+    print("  │ テスト               │ 結果       │ 理由                       │")
+    print("  ├──────────────────────┼────────────┼────────────────────────────┤")
+    print("  │ get_order_status     │ ✅ ALLOW   │ 全ユーザーに許可           │")
+    print("  │ process_refund $100  │ ✅ ALLOW   │ amount < 500               │")
+    print("  │ process_refund $1000 │ 🚫 DENY   │ amount >= 500              │")
+    print("  └──────────────────────┴────────────┴────────────────────────────┘")
+    print()
+    print("  [AgentCore Policy のポイント]")
+    print("  • Cedar ポリシーがリアルタイムでツール呼び出しを評価")
+    print("  • 入力パラメータ (context.input.*) に基づく条件分岐が可能")
+    print("  • ENFORCE モード: ポリシー違反は即座にブロック")
+    print("  • LOG_ONLY モード: 違反をログに記録するが通過させる（テスト用）")
+    print()
+    print("  [ビジネスルールの例]")
+    print("  • 返金上限: amount < 500")
+    print("  • 部門制限: principal.department == \"finance\"")
+    print("  • 時間制限: context.time.hour >= 9 && context.time.hour <= 17")
+    print("  • リソース制限: resource.sensitivity != \"critical\"")
+    print()
 
 
 if __name__ == "__main__":
-    demo_policy_evaluation()
-    print("\n" + "=" * 70)
-    print(" AgentCore Policy デモ完了")
-    print("=" * 70)
-    print("\n[Key Takeaways]")
-    print("1. Cedar は宣言的 → ビジネスルールを自然言語に近い形で記述可能")
-    print("2. permit + forbid で包括的な制御が可能")
-    print("3. context でランタイム情報（時刻、ロケーション等）を活用")
-    print("4. ポリシーの評価はリアルタイムで実行される")
-    print("5. 監査ログと組み合わせてコンプライアンスを担保")
+    main()

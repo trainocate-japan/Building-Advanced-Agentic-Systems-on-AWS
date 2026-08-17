@@ -43,26 +43,96 @@ aws bedrock-agentcore-control delete-oauth2-credential-provider \
     echo "  ✅ Credential Provider 削除: $PROVIDER_NAME" || \
     echo "  ─ Credential Provider なし（スキップ）"
 
-# Cognito User Pool の削除 (AgentCore Identity デモ用)
+# AgentCore Gateway Target + Gateway の削除
+echo "  AgentCore Gateway の削除..."
+GATEWAY_ID=$(aws bedrock-agentcore-control list-gateways --region "$REGION" \
+    --query "gateways[?name=='agentcore-handson-gateway'].gatewayId" \
+    --output text 2>/dev/null || echo "")
+if [ -n "$GATEWAY_ID" ] && [ "$GATEWAY_ID" != "None" ]; then
+    # Target 削除
+    TARGET_IDS=$(aws bedrock-agentcore-control list-gateway-targets \
+        --gateway-identifier "$GATEWAY_ID" --region "$REGION" \
+        --query "targets[].targetId" --output text 2>/dev/null || echo "")
+    for tid in $TARGET_IDS; do
+        aws bedrock-agentcore-control delete-gateway-target \
+            --gateway-identifier "$GATEWAY_ID" --target-id "$tid" --region "$REGION" 2>/dev/null && \
+            echo "  ✅ Gateway Target 削除: $tid" || true
+    done
+    sleep 5
+    # Gateway 削除
+    aws bedrock-agentcore-control delete-gateway \
+        --gateway-identifier "$GATEWAY_ID" --region "$REGION" 2>/dev/null && \
+        echo "  ✅ Gateway 削除: $GATEWAY_ID" || \
+        echo "  ⚠️  Gateway 削除失敗"
+else
+    echo "  ─ Gateway なし（スキップ）"
+fi
+
+# Policy Engine の削除
+echo "  Policy Engine の削除..."
+PE_ID=$(aws bedrock-agentcore-control list-policy-engines --region "$REGION" \
+    --query "policyEngines[?name=='agentcore-handson-policy-engine'].policyEngineId" \
+    --output text 2>/dev/null || echo "")
+if [ -n "$PE_ID" ] && [ "$PE_ID" != "None" ]; then
+    # Policy 削除
+    POLICY_IDS=$(aws bedrock-agentcore-control list-policies \
+        --policy-engine-id "$PE_ID" --region "$REGION" \
+        --query "policies[].policyId" --output text 2>/dev/null || echo "")
+    for pid in $POLICY_IDS; do
+        aws bedrock-agentcore-control delete-policy \
+            --policy-engine-id "$PE_ID" --policy-id "$pid" --region "$REGION" 2>/dev/null && \
+            echo "  ✅ Policy 削除: $pid" || true
+    done
+    sleep 3
+    aws bedrock-agentcore-control delete-policy-engine \
+        --policy-engine-id "$PE_ID" --region "$REGION" 2>/dev/null && \
+        echo "  ✅ Policy Engine 削除: $PE_ID" || \
+        echo "  ⚠️  Policy Engine 削除失敗"
+else
+    echo "  ─ Policy Engine なし（スキップ）"
+fi
+
+# Lambda 関数の削除
+echo "  Lambda 関数の削除..."
+aws lambda delete-function --function-name agentcore-handson-tools --region "$REGION" 2>/dev/null && \
+    echo "  ✅ Lambda 削除: agentcore-handson-tools" || \
+    echo "  ─ Lambda なし（スキップ）"
+
+# IAM ロールの削除 (Gateway + Lambda)
+echo "  IAM ロールの削除..."
+for ROLE in AgentCoreHandsonGatewayRole AgentCoreHandsonLambdaRole; do
+    # インラインポリシー削除
+    POLICIES=$(aws iam list-role-policies --role-name "$ROLE" --query "PolicyNames[]" --output text 2>/dev/null || echo "")
+    for p in $POLICIES; do
+        aws iam delete-role-policy --role-name "$ROLE" --policy-name "$p" 2>/dev/null
+    done
+    # マネージドポリシーデタッチ
+    ATTACHED=$(aws iam list-attached-role-policies --role-name "$ROLE" --query "AttachedPolicies[].PolicyArn" --output text 2>/dev/null || echo "")
+    for arn in $ATTACHED; do
+        aws iam detach-role-policy --role-name "$ROLE" --policy-arn "$arn" 2>/dev/null
+    done
+    aws iam delete-role --role-name "$ROLE" 2>/dev/null && \
+        echo "  ✅ IAM ロール削除: $ROLE" || \
+        echo "  ─ IAM ロールなし: $ROLE（スキップ）"
+done
+
+# Cognito User Pool の削除
 echo "  Cognito User Pool の削除..."
 POOL_ID=$(aws cognito-idp list-user-pools --max-results 20 --region "$REGION" \
     --query "UserPools[?Name=='AgentCoreIdentityHandsonPool'].Id" \
     --output text 2>/dev/null || echo "")
 
 if [ -n "$POOL_ID" ] && [ "$POOL_ID" != "None" ]; then
-    # ドメイン削除（User Pool 削除前に必要）
     DOMAIN=$(aws cognito-idp describe-user-pool --user-pool-id "$POOL_ID" --region "$REGION" \
         --query "UserPool.Domain" --output text 2>/dev/null || echo "")
     if [ -n "$DOMAIN" ] && [ "$DOMAIN" != "None" ]; then
         aws cognito-idp delete-user-pool-domain \
             --domain "$DOMAIN" --user-pool-id "$POOL_ID" --region "$REGION" 2>/dev/null && \
-            echo "  ✅ Cognito ドメイン削除: $DOMAIN" || \
-            echo "  ⚠️  ドメイン削除失敗"
+            echo "  ✅ Cognito ドメイン削除: $DOMAIN" || true
     fi
-    # User Pool 削除
     aws cognito-idp delete-user-pool --user-pool-id "$POOL_ID" --region "$REGION" 2>/dev/null && \
         echo "  ✅ User Pool 削除: $POOL_ID" || \
-        echo "  ⚠️  User Pool 削除失敗（手動で確認してください）"
+        echo "  ⚠️  User Pool 削除失敗"
 else
     echo "  ─ Cognito User Pool なし（スキップ）"
 fi
