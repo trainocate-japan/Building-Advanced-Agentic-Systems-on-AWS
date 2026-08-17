@@ -71,7 +71,7 @@ fi
 # Policy Engine の削除
 echo "  Policy Engine の削除..."
 PE_ID=$(aws bedrock-agentcore-control list-policy-engines --region "$REGION" \
-    --query "policyEngines[?name=='agentcore-handson-policy-engine'].policyEngineId" \
+    --query "policyEngines[?name=='agentcore_handson_policy_engine'].policyEngineId" \
     --output text 2>/dev/null || echo "")
 if [ -n "$PE_ID" ] && [ "$PE_ID" != "None" ]; then
     # Policy 削除

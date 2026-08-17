@@ -41,7 +41,7 @@ GATEWAY_NAME = "agentcore-handson-gateway"
 GATEWAY_ROLE_NAME = "AgentCoreHandsonGatewayRole"
 LAMBDA_ROLE_NAME = "AgentCoreHandsonLambdaRole"
 LAMBDA_FUNCTION_NAME = "agentcore-handson-tools"
-POLICY_ENGINE_NAME = "agentcore-handson-policy-engine"
+POLICY_ENGINE_NAME = "agentcore_handson_policy_engine"
 CONFIG_FILE = "identity_config.json"
 
 
