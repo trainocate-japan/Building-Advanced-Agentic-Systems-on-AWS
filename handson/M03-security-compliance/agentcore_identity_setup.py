@@ -285,19 +285,19 @@ def main():
     else:
         username = f"testuser-{random_suffix()}"
         password = f"TestPass{random_suffix(6)}!1"
-    cognito_client.admin_create_user(
-        UserPoolId=user_pool_id, Username=username,
-        TemporaryPassword=password, MessageAction="SUPPRESS",
-        UserAttributes=[
-            {"Name": "email", "Value": f"{username}@example.com"},
-            {"Name": "email_verified", "Value": "true"},
-        ],
-    )
-    cognito_client.admin_set_user_password(
-        UserPoolId=user_pool_id, Username=username,
-        Password=password, Permanent=True,
-    )
-    print_success(f"ユーザー: {username}")
+        cognito_client.admin_create_user(
+            UserPoolId=user_pool_id, Username=username,
+            TemporaryPassword=password, MessageAction="SUPPRESS",
+            UserAttributes=[
+                {"Name": "email", "Value": f"{username}@example.com"},
+                {"Name": "email_verified", "Value": "true"},
+            ],
+        )
+        cognito_client.admin_set_user_password(
+            UserPoolId=user_pool_id, Username=username,
+            Password=password, Permanent=True,
+        )
+        print_success(f"テストユーザー作成: {username}")
     print_end()
 
     # =========================================================================
