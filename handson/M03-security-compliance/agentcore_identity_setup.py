@@ -89,14 +89,16 @@ def get_account_id():
     return sts.get_caller_identity()["Account"]
 
 
-def wait_for_status(client, get_func, expected_status, description, max_wait=180):
-    """リソースのステータスが期待値になるまで待機"""
+def wait_for_status(client, get_func, expected_statuses, description, max_wait=180):
+    """リソースのステータスが期待値のいずれかになるまで待機"""
+    if isinstance(expected_statuses, str):
+        expected_statuses = [expected_statuses]
     print_wait(f"{description} の準備完了を待機中...")
     for i in range(max_wait // 5):
         try:
             response = get_func()
             status = response.get("status", "UNKNOWN")
-            if status == expected_status:
+            if status in expected_statuses:
                 print_success(f"{description}: {status}")
                 return response
             if status in ("FAILED", "DELETE_FAILED"):
@@ -107,7 +109,7 @@ def wait_for_status(client, get_func, expected_status, description, max_wait=180
             else:
                 raise
         time.sleep(5)
-    raise Exception(f"{description} がタイムアウトしました")
+    raise Exception(f"{description} がタイムアウトしました（最終ステータス: {status}）")
 
 
 # =============================================================================
@@ -486,11 +488,11 @@ def handler(event, context):
     print_info("Policy Engine ID", policy_engine_id)
     print_info("Policy Engine ARN", policy_engine_arn)
 
-    # READY になるまで待機
+    # ACTIVE になるまで待機
     wait_for_status(
         agentcore_client,
         lambda: agentcore_client.get_policy_engine(policyEngineId=policy_engine_id),
-        "READY",
+        "ACTIVE",
         "Policy Engine",
     )
     print_end()
@@ -529,7 +531,7 @@ def handler(event, context):
     wait_for_status(
         agentcore_client,
         lambda: agentcore_client.get_gateway(gatewayIdentifier=gateway_id),
-        "READY",
+        ["READY", "ACTIVE"],
         "Gateway",
     )
     print_end()
@@ -588,7 +590,7 @@ def handler(event, context):
         lambda: agentcore_client.get_gateway_target(
             gatewayIdentifier=gateway_id, targetId=target_id
         ),
-        "READY",
+        ["READY", "ACTIVE"],
         "Gateway Target",
     )
     print_end()
