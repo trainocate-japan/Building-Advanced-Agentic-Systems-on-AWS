@@ -618,6 +618,17 @@ def handler(event, context):
             gatewayIdentifier=gateway_id,
             name="handson-tools",
             description="ハンズオン用ツール（返金処理 + 注文確認）",
+            credentialProviderConfigurations=[
+                {
+                    "credentialProviderType": "GATEWAY_IAM_ROLE",
+                    "credentialProvider": {
+                        "iamCredentialProvider": {
+                            "service": "lambda",
+                            "region": REGION,
+                        }
+                    },
+                }
+            ],
             targetConfiguration={
                 "mcp": {
                     "lambda": {
