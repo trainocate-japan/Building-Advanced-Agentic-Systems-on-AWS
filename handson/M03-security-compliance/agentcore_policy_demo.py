@@ -101,7 +101,7 @@ def main():
     )
 
     agent = Agent(
-        model="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        model="us.anthropic.claude-sonnet-4-6",
         tools=[mcp_client],
         system_prompt="""あなたはカスタマーサポートエージェントです。
 ユーザーの依頼に対して適切なツールを使って対応してください。

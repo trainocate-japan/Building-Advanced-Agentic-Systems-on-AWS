@@ -101,7 +101,7 @@ def main():
         )
 
         agent = Agent(
-            model="us.anthropic.claude-sonnet-4-20250514-v1:0",
+            model="us.anthropic.claude-sonnet-4-6",
             tools=[mcp_client],
             system_prompt="あなたはカスタマーサポートエージェントです。ツールを使って回答してください。",
         )
@@ -142,7 +142,7 @@ def main():
         )
 
         agent_fake = Agent(
-            model="us.anthropic.claude-sonnet-4-20250514-v1:0",
+            model="us.anthropic.claude-sonnet-4-6",
             tools=[mcp_client_fake],
             system_prompt="ツールを使って回答してください。",
         )
