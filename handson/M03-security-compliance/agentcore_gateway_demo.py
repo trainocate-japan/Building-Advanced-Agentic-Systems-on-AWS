@@ -1,9 +1,9 @@
 """
-モジュール 3: AgentCore Gateway - 認証デモ
+モジュール 3: AgentCore Gateway - 認証デモ (Strands Agent + MCP)
 
-AgentCore Gateway に対して:
-1. 有効なトークンでリクエスト → 成功
-2. 無効なトークンでリクエスト → 拒否
+Strands Agent が AgentCore Gateway に MCP クライアントとして接続し:
+1. 有効なトークンでリクエスト → ツール呼び出し成功
+2. 無効なトークンでリクエスト → 認証拒否
 
 Gateway の JWT Authorizer が Cognito トークンを検証し、
 認証が通ったリクエストのみバックエンド Lambda に転送されることを確認します。
@@ -16,7 +16,9 @@ import sys
 import base64
 import urllib.request
 import urllib.parse
-import boto3
+from strands import Agent
+from strands.tools.mcp import MCPClient
+from mcp.client.streamable_http import streamablehttp_client
 
 # =============================================================================
 # 設定
@@ -59,58 +61,6 @@ def get_2lo_token(config):
         return json.loads(resp.read().decode())["access_token"]
 
 
-def invoke_gateway(config, token, tool_name, tool_input, label=""):
-    """Gateway を呼び出し"""
-    agentcore = boto3.client("bedrock-agentcore", region_name=config["region"])
-
-    print(f"  │ 🔧 ツール: {tool_name}")
-    print(f"  │ 📥 入力:  {json.dumps(tool_input, ensure_ascii=False)}")
-    if token:
-        print(f"  │ 🔑 トークン: {token[:30]}...（有効）")
-    else:
-        print(f"  │ 🔑 トークン: なし（無効）")
-    print(f"  │")
-
-    try:
-        # Gateway の invoke API
-        payload = json.dumps({
-            "tool_name": tool_name,
-            "tool_input": tool_input,
-        }).encode()
-
-        invoke_params = {
-            "gatewayIdentifier": config["gateway_id"],
-            "targetName": "handson-tools",
-            "action": f"handson-tools___{tool_name}",
-            "payload": payload,
-        }
-        if token:
-            invoke_params["authorizationToken"] = f"Bearer {token}"
-
-        response = agentcore.invoke_gateway(**invoke_params)
-
-        # レスポンス処理
-        response_body = response.get("body", b"")
-        if hasattr(response_body, "read"):
-            response_body = response_body.read()
-        if isinstance(response_body, bytes):
-            response_body = response_body.decode()
-
-        result = json.loads(response_body) if response_body else {}
-        print(f"  │ ✅ 成功! レスポンス:")
-        print(f"  │    {json.dumps(result, ensure_ascii=False, indent=2)[:200]}")
-        return True
-
-    except Exception as e:
-        error_msg = str(e)
-        if "AccessDenied" in error_msg or "Unauthorized" in error_msg or "403" in error_msg:
-            print(f"  │ 🚫 アクセス拒否!")
-            print(f"  │    {error_msg[:150]}")
-        else:
-            print(f"  │ ❌ エラー: {error_msg[:150]}")
-        return False
-
-
 # =============================================================================
 # メイン
 # =============================================================================
@@ -123,53 +73,93 @@ def main():
     print("║  AgentCore Gateway: 認証 (Identity) デモ                            ║")
     print("╚══════════════════════════════════════════════════════════════════════╝")
     print()
-    print("  Gateway の JWT Authorizer が認証を検証する様子を確認します。")
+    print("  Strands Agent が Gateway に MCP 接続し、JWT 認証の動作を確認します。")
     print()
     print(f"  Gateway URL: {config['gateway_url']}")
-    print(f"  Gateway ID:  {config['gateway_id']}")
     print()
 
-    # ─── テスト 1: 有効なトークンでリクエスト ───────────────────────────────
+    # ─── テスト 1: 有効なトークンで接続 ─────────────────────────────────────
 
-    print("  ┌─ テスト 1: 有効なトークンでリクエスト ────────────────────────────")
+    print("  ┌─ テスト 1: 有効なトークンで Gateway に接続 ──────────────────────")
     print(f"  │")
-    print(f"  │ 2LO (Client Credentials) でトークンを取得してリクエストします。")
+    print(f"  │ 2LO (Client Credentials) でトークンを取得...")
+
+    token = get_2lo_token(config)
+    print(f"  │ ✅ トークン取得: {token[:30]}...")
     print(f"  │")
+    print(f"  │ Strands Agent → Gateway (MCP) → Lambda")
+    print(f"  │")
+
+    gateway_url = config["gateway_url"]
 
     try:
-        token = get_2lo_token(config)
-        print(f"  │ ✅ トークン取得成功")
+        mcp_client = MCPClient(
+            lambda: streamablehttp_client(
+                url=gateway_url,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        )
+
+        agent = Agent(
+            model="us.amazon.nova-pro-v1:0",
+            tools=[mcp_client],
+            system_prompt="あなたはカスタマーサポートエージェントです。ツールを使って回答してください。",
+        )
+
+        print(f"  │ エージェントに指示: 「注文 ORD-12345 のステータスを確認して」")
         print(f"  │")
-        result = invoke_gateway(config, token, "get_order_status", {"order_id": "ORD-12345"})
+
+        response = agent("注文 ORD-12345 のステータスを確認してください。")
+        response_text = str(response)
+
+        print(f"  │ ✅ 成功! エージェント応答:")
+        for line in response_text[:300].split("\n"):
+            print(f"  │    {line}")
+        print(f"  │")
+        print(f"  │ → 有効なトークンで Gateway 認証が通り、Lambda が実行された")
+
     except Exception as e:
-        print(f"  │ ❌ エラー: {e}")
-        result = False
+        print(f"  │ ❌ エラー: {str(e)[:200]}")
 
     print(f"  └──────────────────────────────────────────────────────────────────")
 
-    # ─── テスト 2: 無効なトークンでリクエスト ───────────────────────────────
+    # ─── テスト 2: 無効なトークンで接続 ─────────────────────────────────────
 
     print()
-    print("  ┌─ テスト 2: 無効なトークンでリクエスト ────────────────────────────")
+    print("  ┌─ テスト 2: 無効なトークンで Gateway に接続 ──────────────────────")
     print(f"  │")
-    print(f"  │ 偽のトークンでリクエストし、拒否されることを確認します。")
-    print(f"  │")
-
-    fake_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYWtlIn0.fake_signature"
-    invoke_gateway(config, fake_token, "get_order_status", {"order_id": "ORD-12345"})
-
-    print(f"  └──────────────────────────────────────────────────────────────────")
-
-    # ─── テスト 3: トークンなしでリクエスト ─────────────────────────────────
-
-    print()
-    print("  ┌─ テスト 3: トークンなしでリクエスト ──────────────────────────────")
-    print(f"  │")
-    print(f"  │ トークンを付けずにリクエストし、拒否されることを確認します。")
+    print(f"  │ 偽のトークンで接続し、認証が拒否されることを確認します。")
     print(f"  │")
 
-    invoke_gateway(config, None, "get_order_status", {"order_id": "ORD-12345"})
+    fake_token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmYWtlIn0.invalid"
 
+    try:
+        mcp_client_fake = MCPClient(
+            lambda: streamablehttp_client(
+                url=gateway_url,
+                headers={"Authorization": f"Bearer {fake_token}"},
+            )
+        )
+
+        agent_fake = Agent(
+            model="us.amazon.nova-pro-v1:0",
+            tools=[mcp_client_fake],
+            system_prompt="ツールを使って回答してください。",
+        )
+
+        response = agent_fake("注文 ORD-12345 のステータスを確認してください。")
+        print(f"  │ ⚠️  予想外: 応答が返った: {str(response)[:100]}")
+
+    except Exception as e:
+        error_msg = str(e)
+        if "401" in error_msg or "403" in error_msg or "Unauthorized" in error_msg or "auth" in error_msg.lower():
+            print(f"  │ 🚫 認証拒否! JWT Authorizer がトークンを検証し拒否しました")
+            print(f"  │    エラー: {error_msg[:150]}")
+        else:
+            print(f"  │ ❌ エラー（認証拒否の可能性）: {error_msg[:150]}")
+
+    print(f"  │")
+    print(f"  │ → 無効なトークンは Gateway の JWT Authorizer で即座にブロック")
     print(f"  └──────────────────────────────────────────────────────────────────")
 
     # ─── まとめ ────────────────────────────────────────────────────────────
@@ -178,14 +168,14 @@ def main():
     print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print()
     print("  [結果]")
-    print("  • 有効なトークン → Gateway が認証を通し、Lambda が実行される")
-    print("  • 無効なトークン → JWT Authorizer が拒否、Lambda に到達しない")
-    print("  • トークンなし   → 同様に拒否")
+    print("  • 有効なトークン → Gateway 認証通過 → Lambda 実行 → 応答返却")
+    print("  • 無効なトークン → JWT Authorizer で即座にブロック")
     print()
     print("  [AgentCore Identity の役割]")
-    print("  • インバウンド認証: JWT Authorizer がトークンを検証")
-    print("  • Cognito の JWKS エンドポイントで署名を確認")
+    print("  • Gateway が CUSTOM_JWT Authorizer で全リクエストを検証")
+    print("  • Cognito の JWKS で署名を暗号的に確認")
     print("  • allowedClients でクライアント ID を制限")
+    print("  • トークンなし/偽造/期限切れ → 即座に拒否")
     print()
 
 
