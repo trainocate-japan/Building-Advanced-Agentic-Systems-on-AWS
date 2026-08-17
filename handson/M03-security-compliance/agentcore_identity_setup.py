@@ -183,6 +183,7 @@ def main():
         CallbackURLs=["https://localhost/callback"],  # 仮（後で AgentCore URL に更新）
         ExplicitAuthFlows=[
             "ALLOW_USER_PASSWORD_AUTH",
+            "ALLOW_ADMIN_USER_PASSWORD_AUTH",
             "ALLOW_REFRESH_TOKEN_AUTH",
         ],
     )
@@ -267,6 +268,7 @@ def main():
         CallbackURLs=[callback_url],
         ExplicitAuthFlows=[
             "ALLOW_USER_PASSWORD_AUTH",
+            "ALLOW_ADMIN_USER_PASSWORD_AUTH",
             "ALLOW_REFRESH_TOKEN_AUTH",
         ],
     )
