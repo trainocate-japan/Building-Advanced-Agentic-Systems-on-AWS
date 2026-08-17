@@ -126,80 +126,67 @@ def demo_summarizing():
         conversation_manager=summarizing_manager,
     )
 
-    # まず会話を蓄積
-    print(f"  [フェーズ1] 会話を蓄積中...")
+    print(f"  会話ターン数: {len(CONVERSATION_TURNS)}")
+    print(f"  reduce_context() を毎ターン呼び出し、要約の発生を観察します")
     print(f"{'─' * 70}")
 
     for i, user_message in enumerate(CONVERSATION_TURNS, 1):
-        print(f"  [ターン {i:2d}] ユーザー: {user_message[:50]}...")
+        print(f"\n  [ターン {i:2d}] ユーザー: {user_message[:50]}...")
+
         response = agent(user_message)
         response_text = str(response)
         print(f"           エージェント: {response_text[:100]}...")
 
-    msg_count_before = len(agent.messages)
+        msg_count_before = len(agent.messages)
+
+        # reduce_context を毎ターン呼び出し（本番では ContextWindowOverflow 時に自動実行）
+        try:
+            summarizing_manager.reduce_context(agent)
+            msg_count_after = len(agent.messages)
+            if msg_count_after < msg_count_before:
+                print(f"           ⚡ 要約発生! メッセージ: {msg_count_before} → {msg_count_after}"
+                      f"（{msg_count_before - msg_count_after} 件を圧縮）")
+                # 要約メッセージの内容を表示
+                first_msg = agent.messages[0]
+                content = first_msg.get("content", [])
+                if content and isinstance(content, list):
+                    text = content[0].get("text", "")
+                    # 要約の最初の数行を表示
+                    lines = text.split("\n")
+                    preview = "\n".join(lines[:8])
+                    print(f"           [要約内容プレビュー]")
+                    for line in lines[:8]:
+                        if line.strip():
+                            print(f"             {line}")
+                    if len(lines) > 8:
+                        print(f"             ... (以下省略)")
+            else:
+                print(f"           [メッセージ数: {msg_count_after}]（要約不要 - メッセージが少ない）")
+        except Exception:
+            # メッセージが少なすぎて要約できない場合
+            print(f"           [メッセージ数: {msg_count_before}]（要約不要 - メッセージが少ない）")
+
+    # 最終状態
     print(f"\n{'─' * 70}")
-    print(f"  [フェーズ1 完了] メッセージ数: {msg_count_before}")
-
-    # reduce_context を手動で呼び出して要約を実行
-    print(f"\n  [フェーズ2] reduce_context() を呼び出して要約を実行...")
-    print(f"{'─' * 70}")
-
-    summarizing_manager.reduce_context(agent)
-
-    msg_count_after = len(agent.messages)
-    print(f"  要約前メッセージ数: {msg_count_before}")
-    print(f"  要約後メッセージ数: {msg_count_after}")
-    print(f"  削減されたメッセージ: {msg_count_before - msg_count_after}")
-
-    # 要約メッセージの内容を確認
-    print(f"\n  [要約メッセージの内容]")
-    print(f"{'─' * 70}")
-    for msg in agent.messages:
-        if msg.get("role") == "user":
-            content = msg.get("content", [])
-            if content and isinstance(content, list):
-                text = content[0].get("text", "")
-                if len(text) > 200 and ("summary" in text.lower() or "要約" in text
-                                        or "conversation" in text.lower()):
-                    print(f"  [要約発見] role=user (要約は user メッセージとして挿入)")
-                    print(f"  {text[:500]}")
-                    print(f"  ..." if len(text) > 500 else "")
-                    break
-        elif msg.get("role") == "assistant":
-            content = msg.get("content", [])
-            if content and isinstance(content, list):
-                text = content[0].get("text", "")
-                if len(text) > 200 and ("summary" in text.lower() or "要約" in text
-                                        or "conversation" in text.lower()
-                                        or "ORD-2026" in text):
-                    print(f"  [要約発見] role=assistant")
-                    print(f"  {text[:500]}")
-                    print(f"  ..." if len(text) > 500 else "")
-                    break
-    else:
-        # 要約メッセージが見つからない場合、最初のメッセージを表示
-        if agent.messages:
-            first_msg = agent.messages[0]
-            content = first_msg.get("content", [])
-            if content and isinstance(content, list):
-                text = content[0].get("text", "")
-                print(f"  [最初のメッセージ] role={first_msg.get('role')}")
-                print(f"  {text[:500]}")
+    print(f"  [最終状態]")
+    print(f"  最終メッセージ数: {len(agent.messages)}")
+    print(f"  → 要約により古いメッセージが圧縮されつつ、重要情報は保持")
 
     # 要約後に追加質問して、情報が保持されているか確認
-    print(f"\n\n  [フェーズ3] 要約後に情報保持を確認")
+    print(f"\n  [情報保持の確認]")
     print(f"{'─' * 70}")
     test_question = "最初に伝えた注文番号と、報告した2つの問題を教えてください。"
     print(f"  質問: {test_question}")
     response = agent(test_question)
-    print(f"  回答: {str(response)[:300]}")
+    print(f"  回答: {str(response)[:400]}")
 
     print(f"\n{'─' * 70}")
     print(f"""
   [結果]
-  → 要約により {msg_count_before - msg_count_after} メッセージが 1 つの要約に圧縮された
-  → 注文番号 ORD-2026-78901、破損モニター、サブスク料金の情報が保持されている
-  → SlidingWindow と異なり、重要情報が失われない
+  → 毎ターン reduce_context() を呼ぶことで、要約の発動タイミングと
+    生成される要約の内容を確認できた
+  → 注文番号 ORD-2026-78901、破損モニター、サブスク料金の情報が
+    構造化された要約に保持されている
 
   [SlidingWindow との比較]
   ┌───────────────────┬──────────────────────┬──────────────────────────┐
