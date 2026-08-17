@@ -104,9 +104,15 @@ def main():
         model="us.anthropic.claude-sonnet-4-6",
         tools=[mcp_client],
         system_prompt="""あなたはカスタマーサポートエージェントです。
-ユーザーの依頼に対して適切なツールを使って対応してください。
+必ずツールを使って処理を実行してください。ツールを使わずにテキストだけで回答しないでください。
+利用可能なツール: get_order_status, process_refund
 ツールの実行結果をそのまま簡潔に報告してください。""",
     )
+
+    # 読み込まれたツール一覧を表示
+    tool_names = list(agent.tool_registry.registry.keys())
+    print(f"  📋 読み込まれたツール: {tool_names}")
+    print()
 
     # ─── テスト 1: get_order_status（許可） ─────────────────────────────────
 
