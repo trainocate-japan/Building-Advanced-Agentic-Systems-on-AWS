@@ -502,7 +502,8 @@ def handler(event, context):
     except Exception as e:
         if "already exists" in str(e) or "Conflict" in str(e):
             engines = agentcore_client.list_policy_engines()
-            for eng in engines.get("items", []):
+            items = engines.get("items", engines.get("policyEngines", []))
+            for eng in items:
                 if eng.get("name") == POLICY_ENGINE_NAME:
                     policy_engine_id = eng["policyEngineId"]
                     policy_engine_arn = eng.get("policyEngineArn",
