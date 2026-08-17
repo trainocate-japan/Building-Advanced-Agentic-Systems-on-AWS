@@ -175,11 +175,20 @@ Strands SDK の 3 種類の会話マネージャー：
 python summarizing_manager.py
 ```
 
+> ⚠️ **デモ用設定について**
+>
+> このデモでは要約の発動を短い会話で確認できるよう、`proactive_compression` の閾値を
+> 非常に低く（5%）設定しています。Nova Pro のコンテキストウィンドウは 300K トークンと
+> 大きいため、通常の設定では 20 ターン程度の会話では要約がトリガーされません。
+>
+> - デモ設定: `proactive_compression={"compression_threshold": 0.05}` → 5% で発動
+> - 本番推奨: `proactive_compression=True` → 70% で発動（デフォルト閾値）
+> - 無指定: リアクティブのみ（ContextWindowOverflowError 発生時に初めて要約）
+
 出力を確認し、以下を議論します：
-- 20 ターンの長い会話で要約が自動発生する様子
-- 要約によって保持される情報と失われる情報
-- `summary_ratio`（0.3 = 30% を要約）の影響
-- `preserve_recent_messages`（直近 10 メッセージは常に保持）の効果
+- 会話の途中で要約が自動発生する様子（⚡マークで表示）
+- 要約によって保持される情報（注文番号、顧客名、決定事項）と圧縮される情報
+- メッセージ数の推移（要約後に減少する）
 
 ### ステップ 3.3: パラメータチューニング
 
@@ -188,6 +197,25 @@ python summarizing_manager.py
 | `summary_ratio` | 0.3 | コンテキスト削減時に要約する割合（0.1〜0.8） |
 | `preserve_recent_messages` | 10 | 常に保持する最近のメッセージ数 |
 | `summarization_agent` | None | 要約用のカスタムエージェント |
+| `proactive_compression` | None | プロアクティブ圧縮の設定（下記参照） |
+
+**proactive_compression の設定パターン:**
+
+| 設定値 | 動作 |
+|--------|------|
+| `None` / `False` | 無効。ContextWindowOverflowError 発生時のみ要約 |
+| `True` | コンテキスト使用率 70% 超で事前に要約 |
+| `{"compression_threshold": 0.5}` | 50% 超で要約（閾値をカスタム指定） |
+
+**本番環境での推奨設定:**
+
+```python
+conversation_manager = SummarizingConversationManager(
+    summary_ratio=0.3,              # 30% を要約
+    preserve_recent_messages=10,    # 直近10件を保持
+    proactive_compression=True,     # 70% で事前要約
+)
+```
 
 ---
 

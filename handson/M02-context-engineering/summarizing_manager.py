@@ -9,6 +9,9 @@ Strands SDK の SummarizingConversationManager を使用して、
 - 構造化された要約で重要情報を保持
 - ツール使用と結果のペアを分断しない
 - 直近のメッセージは常に保持
+
+※ デモ用に proactive_compression の閾値を低く設定しています。
+  本番設定については steps.md を参照してください。
 """
 
 from strands import Agent
@@ -18,11 +21,12 @@ from strands.agent.conversation_manager import SummarizingConversationManager
 # SummarizingConversationManager の設定
 # =============================================================================
 
-# 要約マネージャーの設定
+# 要約マネージャーの設定（デモ用 - 閾値を低くして要約発動を確認しやすくしている）
+# 本番設定については steps.md パート3 を参照
 conversation_manager = SummarizingConversationManager(
-    summary_ratio=0.3,              # 30% のメッセージを要約（0.1〜0.8）
-    preserve_recent_messages=10,    # 直近 10 メッセージは常に保持
-    # summarization_system_prompt=None,  # カスタム要約プロンプト（省略時はデフォルト使用）
+    summary_ratio=0.5,              # 50% のメッセージを要約（デモ用に積極的に）
+    preserve_recent_messages=4,     # 直近 4 メッセージを保持（デモ用に少なく）
+    proactive_compression={"compression_threshold": 0.05},  # 5% で要約発動（デモ用）
 )
 
 # エージェントの作成
@@ -46,9 +50,12 @@ def simulate_long_conversation():
     print(" SummarizingConversationManager: 長い会話の自動要約")
     print("=" * 70)
     print(f"""
-  設定:
-    summary_ratio: 0.3（30% を要約）
-    preserve_recent_messages: 10（直近10件を保持）
+  設定（デモ用 - 要約発動を確認しやすい設定）:
+    summary_ratio: 0.5（50% を要約）
+    preserve_recent_messages: 4（直近4件を保持）
+    proactive_compression: 5%（コンテキスト使用率 5% で要約発動）
+
+  ※ 本番環境での推奨設定は steps.md パート3 を参照
 
   シナリオ: 顧客が複数の問題を段階的に報告する長い会話
     """)
@@ -148,11 +155,7 @@ def compare_managers():
     3. 直近メッセージは完全に保持（文脈の連続性）
     4. 要約が失敗した場合のフォールバックあり
 
-    パラメータ調整のガイドライン:
-    - summary_ratio 0.1: 少量ずつ要約（メモリ効率重視）
-    - summary_ratio 0.5: 積極的に要約（コスト重視）
-    - preserve_recent_messages 5: 短い文脈で十分な場合
-    - preserve_recent_messages 20: 複雑な会話で文脈が重要な場合
+    ※ パラメータ詳細・本番推奨設定は steps.md パート3 を参照
     """)
 
 
