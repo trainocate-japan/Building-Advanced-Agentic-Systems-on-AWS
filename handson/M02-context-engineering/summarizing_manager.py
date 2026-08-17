@@ -138,33 +138,29 @@ def demo_summarizing():
         print(f"           エージェント: {response_text[:100]}...")
 
         msg_count_before = len(agent.messages)
+        print(f"           [メッセージ数: {msg_count_before}]")
 
         # reduce_context を毎ターン呼び出し（本番では ContextWindowOverflow 時に自動実行）
         try:
             summarizing_manager.reduce_context(agent)
             msg_count_after = len(agent.messages)
             if msg_count_after < msg_count_before:
-                print(f"           ⚡ 要約発生! メッセージ: {msg_count_before} → {msg_count_after}"
+                print(f"           ⚡ 要約発生! {msg_count_before} → {msg_count_after}"
                       f"（{msg_count_before - msg_count_after} 件を圧縮）")
                 # 要約メッセージの内容を表示
                 first_msg = agent.messages[0]
                 content = first_msg.get("content", [])
                 if content and isinstance(content, list):
                     text = content[0].get("text", "")
-                    # 要約の最初の数行を表示
                     lines = text.split("\n")
-                    preview = "\n".join(lines[:8])
                     print(f"           [要約内容プレビュー]")
                     for line in lines[:8]:
                         if line.strip():
                             print(f"             {line}")
                     if len(lines) > 8:
                         print(f"             ... (以下省略)")
-            else:
-                print(f"           [メッセージ数: {msg_count_after}]（要約不要 - メッセージが少ない）")
         except Exception:
-            # メッセージが少なすぎて要約できない場合
-            print(f"           [メッセージ数: {msg_count_before}]（要約不要 - メッセージが少ない）")
+            pass
 
     # 最終状態
     print(f"\n{'─' * 70}")
