@@ -488,6 +488,9 @@ def handler(event, context):
     # =========================================================================
     print_step(7, "Policy Engine 作成")
 
+    policy_engine_id = None
+    policy_engine_arn = None
+
     try:
         resp = agentcore_client.create_policy_engine(
             name=POLICY_ENGINE_NAME,
@@ -496,24 +499,19 @@ def handler(event, context):
         policy_engine_id = resp["policyEngineId"]
         policy_engine_arn = resp["policyEngineArn"]
         print_success(f"Policy Engine 作成: {policy_engine_id}")
-    except agentcore_client.exceptions.ConflictException:
-        # 既存を取得
-        engines = agentcore_client.list_policy_engines()
-        for e in engines.get("items", []):
-            if e.get("name") == POLICY_ENGINE_NAME:
-                policy_engine_id = e["policyEngineId"]
-                policy_engine_arn = e["policyEngineArn"]
-                break
-        print_success(f"Policy Engine 既存（スキップ）: {policy_engine_id}")
     except Exception as e:
-        if "ConflictException" in str(type(e).__name__) or "already exists" in str(e):
+        if "already exists" in str(e) or "Conflict" in str(e):
             engines = agentcore_client.list_policy_engines()
             for eng in engines.get("items", []):
                 if eng.get("name") == POLICY_ENGINE_NAME:
                     policy_engine_id = eng["policyEngineId"]
-                    policy_engine_arn = eng["policyEngineArn"]
+                    policy_engine_arn = eng.get("policyEngineArn",
+                        f"arn:aws:bedrock-agentcore:{REGION}:{account_id}:policy-engine/{eng['policyEngineId']}")
                     break
-            print_success(f"Policy Engine 既存（スキップ）: {policy_engine_id}")
+            if policy_engine_id:
+                print_success(f"Policy Engine 既存（スキップ）: {policy_engine_id}")
+            else:
+                raise Exception("Policy Engine が既存だが一覧から見つからない")
         else:
             raise
 
