@@ -148,34 +148,56 @@ def main():
     # =========================================================================
     print_step(1, "Cognito User Pool + ドメイン + Resource Server")
 
-    response = cognito_client.create_user_pool(
-        PoolName=POOL_NAME,
-        Policies={"PasswordPolicy": {
-            "MinimumLength": 8, "RequireUppercase": True,
-            "RequireLowercase": True, "RequireNumbers": True,
-            "RequireSymbols": False,
-        }},
-        AutoVerifiedAttributes=["email"],
-        Schema=[{"Name": "email", "AttributeDataType": "String",
-                 "Required": True, "Mutable": True}],
-    )
-    user_pool_id = response["UserPool"]["Id"]
-    print_success(f"User Pool: {user_pool_id}")
+    # 既存チェック
+    existing_pools = cognito_client.list_user_pools(MaxResults=20)
+    existing_pool = None
+    for pool in existing_pools.get("UserPools", []):
+        if pool.get("Name") == POOL_NAME:
+            existing_pool = pool
+            break
 
-    domain_name = f"agentcore-handson-{random_suffix()}"
-    cognito_client.create_user_pool_domain(Domain=domain_name, UserPoolId=user_pool_id)
-    print_success(f"ドメイン: {domain_name}")
+    if existing_pool:
+        user_pool_id = existing_pool["Id"]
+        print_success(f"User Pool 既存（スキップ）: {user_pool_id}")
+        # ドメイン名を取得
+        pool_detail = cognito_client.describe_user_pool(UserPoolId=user_pool_id)
+        domain_name = pool_detail["UserPool"].get("Domain", "")
+        if domain_name:
+            print_success(f"ドメイン既存: {domain_name}")
+        else:
+            domain_name = f"agentcore-handson-{random_suffix()}"
+            cognito_client.create_user_pool_domain(Domain=domain_name, UserPoolId=user_pool_id)
+            print_success(f"ドメイン作成: {domain_name}")
+        print_success(f"Resource Server: {RESOURCE_SERVER_ID}")
+    else:
+        response = cognito_client.create_user_pool(
+            PoolName=POOL_NAME,
+            Policies={"PasswordPolicy": {
+                "MinimumLength": 8, "RequireUppercase": True,
+                "RequireLowercase": True, "RequireNumbers": True,
+                "RequireSymbols": False,
+            }},
+            AutoVerifiedAttributes=["email"],
+            Schema=[{"Name": "email", "AttributeDataType": "String",
+                     "Required": True, "Mutable": True}],
+        )
+        user_pool_id = response["UserPool"]["Id"]
+        print_success(f"User Pool 作成: {user_pool_id}")
 
-    cognito_client.create_resource_server(
-        UserPoolId=user_pool_id,
-        Identifier=RESOURCE_SERVER_ID,
-        Name=RESOURCE_SERVER_NAME,
-        Scopes=[
-            {"ScopeName": "read", "ScopeDescription": "読み取り"},
-            {"ScopeName": "write", "ScopeDescription": "書き込み"},
-        ],
-    )
-    print_success(f"Resource Server: {RESOURCE_SERVER_ID}")
+        domain_name = f"agentcore-handson-{random_suffix()}"
+        cognito_client.create_user_pool_domain(Domain=domain_name, UserPoolId=user_pool_id)
+        print_success(f"ドメイン作成: {domain_name}")
+
+        cognito_client.create_resource_server(
+            UserPoolId=user_pool_id,
+            Identifier=RESOURCE_SERVER_ID,
+            Name=RESOURCE_SERVER_NAME,
+            Scopes=[
+                {"ScopeName": "read", "ScopeDescription": "読み取り"},
+                {"ScopeName": "write", "ScopeDescription": "書き込み"},
+            ],
+        )
+        print_success(f"Resource Server: {RESOURCE_SERVER_ID}")
     print_end()
 
     # =========================================================================
@@ -183,38 +205,61 @@ def main():
     # =========================================================================
     print_step(2, "App Client 作成（2LO用 + 3LO用）")
 
-    # 2LO
-    resp_2lo = cognito_client.create_user_pool_client(
-        UserPoolId=user_pool_id,
-        ClientName=f"{CLIENT_NAME}-2LO",
-        GenerateSecret=True,
-        AllowedOAuthFlows=["client_credentials"],
-        AllowedOAuthScopes=[f"{RESOURCE_SERVER_ID}/read", f"{RESOURCE_SERVER_ID}/write"],
-        AllowedOAuthFlowsUserPoolClient=True,
-    )
-    client_id_2lo = resp_2lo["UserPoolClient"]["ClientId"]
-    client_secret_2lo = resp_2lo["UserPoolClient"]["ClientSecret"]
-    print_success(f"2LO Client: {client_id_2lo}")
+    # 既存クライアントの確認
+    existing_clients = cognito_client.list_user_pool_clients(
+        UserPoolId=user_pool_id, MaxResults=10
+    ).get("UserPoolClients", [])
+    existing_2lo = next((c for c in existing_clients if c.get("ClientName") == f"{CLIENT_NAME}-2LO"), None)
+    existing_3lo = next((c for c in existing_clients if c.get("ClientName") == f"{CLIENT_NAME}-3LO"), None)
 
-    # 3LO
-    resp_3lo = cognito_client.create_user_pool_client(
-        UserPoolId=user_pool_id,
-        ClientName=f"{CLIENT_NAME}-3LO",
-        GenerateSecret=True,
-        AllowedOAuthFlows=["code"],
-        AllowedOAuthScopes=["openid", "profile", "email"],
-        AllowedOAuthFlowsUserPoolClient=True,
-        SupportedIdentityProviders=["COGNITO"],
-        CallbackURLs=["https://localhost/callback"],
-        ExplicitAuthFlows=[
-            "ALLOW_USER_PASSWORD_AUTH",
-            "ALLOW_ADMIN_USER_PASSWORD_AUTH",
-            "ALLOW_REFRESH_TOKEN_AUTH",
-        ],
-    )
-    client_id_3lo = resp_3lo["UserPoolClient"]["ClientId"]
-    client_secret_3lo = resp_3lo["UserPoolClient"]["ClientSecret"]
-    print_success(f"3LO Client: {client_id_3lo}")
+    if existing_2lo and existing_3lo:
+        # 既存の場合は describe で secret を取得
+        desc_2lo = cognito_client.describe_user_pool_client(
+            UserPoolId=user_pool_id, ClientId=existing_2lo["ClientId"]
+        )["UserPoolClient"]
+        client_id_2lo = desc_2lo["ClientId"]
+        client_secret_2lo = desc_2lo["ClientSecret"]
+        print_success(f"2LO Client 既存: {client_id_2lo}")
+
+        desc_3lo = cognito_client.describe_user_pool_client(
+            UserPoolId=user_pool_id, ClientId=existing_3lo["ClientId"]
+        )["UserPoolClient"]
+        client_id_3lo = desc_3lo["ClientId"]
+        client_secret_3lo = desc_3lo["ClientSecret"]
+        print_success(f"3LO Client 既存: {client_id_3lo}")
+    else:
+        # 2LO
+        resp_2lo = cognito_client.create_user_pool_client(
+            UserPoolId=user_pool_id,
+            ClientName=f"{CLIENT_NAME}-2LO",
+            GenerateSecret=True,
+            AllowedOAuthFlows=["client_credentials"],
+            AllowedOAuthScopes=[f"{RESOURCE_SERVER_ID}/read", f"{RESOURCE_SERVER_ID}/write"],
+            AllowedOAuthFlowsUserPoolClient=True,
+        )
+        client_id_2lo = resp_2lo["UserPoolClient"]["ClientId"]
+        client_secret_2lo = resp_2lo["UserPoolClient"]["ClientSecret"]
+        print_success(f"2LO Client 作成: {client_id_2lo}")
+
+        # 3LO
+        resp_3lo = cognito_client.create_user_pool_client(
+            UserPoolId=user_pool_id,
+            ClientName=f"{CLIENT_NAME}-3LO",
+            GenerateSecret=True,
+            AllowedOAuthFlows=["code"],
+            AllowedOAuthScopes=["openid", "profile", "email"],
+            AllowedOAuthFlowsUserPoolClient=True,
+            SupportedIdentityProviders=["COGNITO"],
+            CallbackURLs=["https://localhost/callback"],
+            ExplicitAuthFlows=[
+                "ALLOW_USER_PASSWORD_AUTH",
+                "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+                "ALLOW_REFRESH_TOKEN_AUTH",
+            ],
+        )
+        client_id_3lo = resp_3lo["UserPoolClient"]["ClientId"]
+        client_secret_3lo = resp_3lo["UserPoolClient"]["ClientSecret"]
+        print_success(f"3LO Client 作成: {client_id_3lo}")
     print_end()
 
     # =========================================================================
@@ -222,8 +267,24 @@ def main():
     # =========================================================================
     print_step(3, "テストユーザー作成")
 
-    username = f"testuser-{random_suffix()}"
-    password = f"TestPass{random_suffix(6)}!1"
+    # 既存ユーザーの確認
+    existing_users = cognito_client.list_users(
+        UserPoolId=user_pool_id, Limit=10,
+        Filter='username ^= "testuser-"',
+    ).get("Users", [])
+
+    if existing_users:
+        username = existing_users[0]["Username"]
+        password = f"TestPass{random_suffix(6)}!1"
+        # パスワードをリセット（既存ユーザーの場合）
+        cognito_client.admin_set_user_password(
+            UserPoolId=user_pool_id, Username=username,
+            Password=password, Permanent=True,
+        )
+        print_success(f"テストユーザー既存（パスワードリセット）: {username}")
+    else:
+        username = f"testuser-{random_suffix()}"
+        password = f"TestPass{random_suffix(6)}!1"
     cognito_client.admin_create_user(
         UserPoolId=user_pool_id, Username=username,
         TemporaryPassword=password, MessageAction="SUPPRESS",
