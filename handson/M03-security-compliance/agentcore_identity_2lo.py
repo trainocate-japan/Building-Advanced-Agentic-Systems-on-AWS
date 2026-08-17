@@ -78,14 +78,14 @@ def main():
     print(f"  │ Token Endpoint: {config['token_endpoint']}")
     print(f"  │ Grant Type:     client_credentials")
     print(f"  │ Scopes:         {', '.join(config['scopes_2lo'])}")
-    print(f"  │ Client ID:      {config['client_id']}")
+    print(f"  │ Client ID:      {config['client_id_2lo']}")
     print(f"  │")
     print(f"  │ リクエスト送信中...")
 
     # HTTP POST でトークン取得
     token_endpoint = config["token_endpoint"]
-    client_id = config["client_id"]
-    client_secret = config["client_secret"]
+    client_id = config["client_id_2lo"]
+    client_secret = config["client_secret_2lo"]
     scopes = " ".join(config["scopes_2lo"])
 
     # Basic 認証ヘッダー

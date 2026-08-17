@@ -144,34 +144,52 @@ def main():
     print(f"  │   Cognito の openid/profile/email スコープは 2LO では使用できません")
     print_end()
 
-    # ─── Step 3: App Client ─────────────────────────────────────────────────
+    # ─── Step 3: App Client（2つ作成: 2LO用 + 3LO用）────────────────────────
 
-    print_step(3, "App Client 作成（2LO + 3LO 両対応）")
+    print_step(3, "App Client 作成（2LO 用 + 3LO 用を個別に作成）")
 
-    client_response = cognito_client.create_user_pool_client(
+    print(f"  │ Cognito では client_credentials と code フローを")
+    print(f"  │ 同一クライアントに設定できないため、2つ作成します。")
+    print(f"  │")
+
+    # 2LO 用クライアント（Client Credentials）
+    print_info("アクション", "2LO 用 App Client (client_credentials) を作成中...")
+    client_2lo_response = cognito_client.create_user_pool_client(
         UserPoolId=user_pool_id,
-        ClientName=CLIENT_NAME,
+        ClientName=f"{CLIENT_NAME}-2LO",
         GenerateSecret=True,
-        AllowedOAuthFlows=["client_credentials", "code"],
+        AllowedOAuthFlows=["client_credentials"],
         AllowedOAuthScopes=[
-            "openid", "profile", "email",                   # 3LO 用
-            f"{RESOURCE_SERVER_ID}/read",                    # 2LO 用
-            f"{RESOURCE_SERVER_ID}/write",                   # 2LO 用
+            f"{RESOURCE_SERVER_ID}/read",
+            f"{RESOURCE_SERVER_ID}/write",
         ],
         AllowedOAuthFlowsUserPoolClient=True,
+    )
+    client_id_2lo = client_2lo_response["UserPoolClient"]["ClientId"]
+    client_secret_2lo = client_2lo_response["UserPoolClient"]["ClientSecret"]
+    print_success("2LO App Client 作成完了")
+    print_info("Client ID (2LO)", client_id_2lo)
+
+    # 3LO 用クライアント（Authorization Code）
+    print_info("アクション", "3LO 用 App Client (code) を作成中...")
+    client_3lo_response = cognito_client.create_user_pool_client(
+        UserPoolId=user_pool_id,
+        ClientName=f"{CLIENT_NAME}-3LO",
+        GenerateSecret=True,
+        AllowedOAuthFlows=["code"],
+        AllowedOAuthScopes=["openid", "profile", "email"],
+        AllowedOAuthFlowsUserPoolClient=True,
         SupportedIdentityProviders=["COGNITO"],
-        CallbackURLs=["https://localhost/callback"],  # 仮（後で AgentCore の URL に更新）
+        CallbackURLs=["https://localhost/callback"],  # 仮（後で AgentCore URL に更新）
         ExplicitAuthFlows=[
             "ALLOW_USER_PASSWORD_AUTH",
             "ALLOW_REFRESH_TOKEN_AUTH",
         ],
     )
-    client_id = client_response["UserPoolClient"]["ClientId"]
-    client_secret = client_response["UserPoolClient"]["ClientSecret"]
-    print_success("App Client 作成完了")
-    print_info("Client ID", client_id)
-    print_info("Client Secret", f"{client_secret[:10]}...（省略）")
-    print_info("OAuth Flows", "client_credentials (2LO) + code (3LO)")
+    client_id_3lo = client_3lo_response["UserPoolClient"]["ClientId"]
+    client_secret_3lo = client_3lo_response["UserPoolClient"]["ClientSecret"]
+    print_success("3LO App Client 作成完了")
+    print_info("Client ID (3LO)", client_id_3lo)
     print_end()
 
     # ─── Step 4: テストユーザー ─────────────────────────────────────────────
@@ -219,8 +237,8 @@ def main():
                 "oauthDiscovery": {
                     "discoveryUrl": issuer_url
                 },
-                "clientId": client_id,
-                "clientSecret": client_secret,
+                "clientId": client_id_3lo,
+                "clientSecret": client_secret_3lo,
             }
         },
     )
@@ -236,18 +254,14 @@ def main():
 
     # ─── Step 6: Callback URL 登録 ──────────────────────────────────────────
 
-    print_step(6, "Callback URL を Cognito に登録")
+    print_step(6, "Callback URL を Cognito に登録（3LO クライアント）")
 
     cognito_client.update_user_pool_client(
         UserPoolId=user_pool_id,
-        ClientId=client_id,
-        ClientName=CLIENT_NAME,
-        AllowedOAuthFlows=["client_credentials", "code"],
-        AllowedOAuthScopes=[
-            "openid", "profile", "email",
-            f"{RESOURCE_SERVER_ID}/read",
-            f"{RESOURCE_SERVER_ID}/write",
-        ],
+        ClientId=client_id_3lo,
+        ClientName=f"{CLIENT_NAME}-3LO",
+        AllowedOAuthFlows=["code"],
+        AllowedOAuthScopes=["openid", "profile", "email"],
         AllowedOAuthFlowsUserPoolClient=True,
         SupportedIdentityProviders=["COGNITO"],
         CallbackURLs=[callback_url],
@@ -270,8 +284,10 @@ def main():
         "region": REGION,
         "user_pool_id": user_pool_id,
         "domain_name": domain_name,
-        "client_id": client_id,
-        "client_secret": client_secret,
+        "client_id_2lo": client_id_2lo,
+        "client_secret_2lo": client_secret_2lo,
+        "client_id_3lo": client_id_3lo,
+        "client_secret_3lo": client_secret_3lo,
         "username": username,
         "password": password,
         "issuer_url": issuer_url,

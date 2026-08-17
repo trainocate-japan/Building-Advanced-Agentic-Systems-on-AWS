@@ -84,7 +84,7 @@ def main():
     print(f"  │")
 
     authorize_endpoint = config["authorize_endpoint"]
-    client_id = config["client_id"]
+    client_id = config["client_id_3lo"]
     callback_url = config["callback_url"]
     scopes = " ".join(config["scopes_3lo"])
 
@@ -137,7 +137,7 @@ def main():
         msg = config["username"] + client_id
         secret_hash = base64.b64encode(
             hmac.new(
-                config["client_secret"].encode(),
+                config["client_secret_3lo"].encode(),
                 msg.encode(),
                 hashlib.sha256
             ).digest()
