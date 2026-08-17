@@ -169,26 +169,33 @@ Strands SDK の 3 種類の会話マネージャー：
 | SlidingWindowConversationManager | 古いメッセージ削除 | 簡易的な制限 |
 | **SummarizingConversationManager** | **要約して圧縮** | **本番環境推奨** |
 
-### ステップ 3.2: SummarizingConversationManager の実行
+### ステップ 3.2: SlidingWindow vs Summarizing の比較デモ
 
 ```bash
 python summarizing_manager.py
 ```
 
-> ⚠️ **デモ用設定について**
->
-> このデモでは要約の発動を短い会話で確認できるよう、`proactive_compression` の閾値を
-> 非常に低く（5%）設定しています。Nova Pro のコンテキストウィンドウは 300K トークンと
-> 大きいため、通常の設定では 20 ターン程度の会話では要約がトリガーされません。
->
-> - デモ設定: `proactive_compression={"compression_threshold": 0.05}` → 5% で発動
-> - 本番推奨: `proactive_compression=True` → 70% で発動（デフォルト閾値）
-> - 無指定: リアクティブのみ（ContextWindowOverflowError 発生時に初めて要約）
+このデモは 2 パートで構成されています:
 
-出力を確認し、以下を議論します：
-- 会話の途中で要約が自動発生する様子（⚡マークで表示）
-- 要約によって保持される情報（注文番号、顧客名、決定事項）と圧縮される情報
-- メッセージ数の推移（要約後に減少する）
+**パート 1: SlidingWindowConversationManager（切り捨て）**
+- `window_size=4` に設定し、最大 4 ペアのメッセージのみ保持
+- 5 ターン目以降、古いメッセージが完全に削除される
+- 最後のターンで「注文番号は何でしたっけ？」と聞くと、情報が失われているため回答できない
+
+**パート 2: SummarizingConversationManager（要約保持）**
+- 同じ会話を実行するが、コンテキストウィンドウに余裕がある限り全メッセージを保持
+- 最後のターンでも注文番号を正しく回答できる
+- コンテキストが溢れた場合は、削除ではなく「要約」して重要情報を保持
+
+> ⚠️ **デモの注意点**
+>
+> `SummarizingConversationManager` の要約は **ContextWindowOverflowError** 発生時に
+> リアクティブに実行されます。Nova Pro のコンテキストウィンドウは 300K トークンと
+> 非常に大きいため、7 ターン程度の会話では溢れず、要約は発動しません。
+>
+> 本番環境で数百ターンの長い会話を行う場合や、大量のツール結果を含む会話では
+> 自動的に要約が発動し、重要情報（注文番号、顧客名、決定事項）を保持しつつ
+> コンテキストを圧縮します。
 
 ### ステップ 3.3: パラメータチューニング
 
@@ -197,23 +204,31 @@ python summarizing_manager.py
 | `summary_ratio` | 0.3 | コンテキスト削減時に要約する割合（0.1〜0.8） |
 | `preserve_recent_messages` | 10 | 常に保持する最近のメッセージ数 |
 | `summarization_agent` | None | 要約用のカスタムエージェント |
-| `proactive_compression` | None | プロアクティブ圧縮の設定（下記参照） |
+| `proactive_compression` | None | プロアクティブ圧縮（将来バージョンで有効化予定） |
 
-**proactive_compression の設定パターン:**
+**要約の発動条件:**
 
-| 設定値 | 動作 |
-|--------|------|
-| `None` / `False` | 無効。ContextWindowOverflowError 発生時のみ要約 |
-| `True` | コンテキスト使用率 70% 超で事前に要約 |
-| `{"compression_threshold": 0.5}` | 50% 超で要約（閾値をカスタム指定） |
+| 条件 | 動作 |
+|------|------|
+| コンテキストウィンドウに余裕あり | 何もしない（全メッセージ保持） |
+| ContextWindowOverflowError 発生 | `summary_ratio` 分のメッセージを要約に圧縮 |
+
+**SlidingWindow との使い分け:**
+
+| 状況 | 推奨マネージャー |
+|------|-----------------|
+| 短い会話（〜10ターン） | NullConversationManager |
+| コスト重視・情報喪失許容 | SlidingWindowConversationManager |
+| 本番環境・長い会話 | **SummarizingConversationManager** |
 
 **本番環境での推奨設定:**
 
 ```python
+from strands.agent.conversation_manager import SummarizingConversationManager
+
 conversation_manager = SummarizingConversationManager(
     summary_ratio=0.3,              # 30% を要約
     preserve_recent_messages=10,    # 直近10件を保持
-    proactive_compression=True,     # 70% で事前要約
 )
 ```
 

@@ -1,144 +1,188 @@
 """
-モジュール 2: SummarizingConversationManager - インテリジェントな会話要約
+モジュール 2: 会話マネージャー比較デモ
 
-Strands SDK の SummarizingConversationManager を使用して、
-長い会話でコンテキストウィンドウが飽和する問題を自動的に解決します。
+SlidingWindowConversationManager と SummarizingConversationManager の
+動作を比較し、長い会話でのコンテキスト管理の違いを確認します。
 
-動作:
-- トークン制限を超えると自動的にコンテキストを削減
-- 構造化された要約で重要情報を保持
-- ツール使用と結果のペアを分断しない
-- 直近のメッセージは常に保持
+1. SlidingWindow: 古いメッセージを単純に切り捨て（情報が失われる）
+2. Summarizing: 要約して圧縮（重要情報を保持）
 
-※ デモ用に proactive_compression の閾値を低く設定しています。
-  本番設定については steps.md を参照してください。
+※ SummarizingConversationManager の要約は ContextWindowOverflowError 発生時に
+  リアクティブに実行されます。Nova Pro (300K tokens) では 20 ターン程度の会話では
+  溢れないため、このデモでは SlidingWindow の動作を見せた上で、Summarizing との
+  違いを説明します。本番環境での動作については steps.md パート3 を参照。
 """
 
 from strands import Agent
-from strands.agent.conversation_manager import SummarizingConversationManager
-
-# =============================================================================
-# SummarizingConversationManager の設定
-# =============================================================================
-
-# 要約マネージャーの設定（デモ用 - 閾値を低くして要約発動を確認しやすくしている）
-# 本番設定については steps.md パート3 を参照
-conversation_manager = SummarizingConversationManager(
-    summary_ratio=0.5,              # 50% のメッセージを要約（デモ用に積極的に）
-    preserve_recent_messages=4,     # 直近 4 メッセージを保持（デモ用に少なく）
-    proactive_compression={"compression_threshold": 0.05},  # 5% で要約発動（デモ用）
+from strands.agent.conversation_manager import (
+    SlidingWindowConversationManager,
+    SummarizingConversationManager,
 )
 
-# エージェントの作成
-agent = Agent(
-    model="us.amazon.nova-pro-v1:0",
-    system_prompt="""あなたは EC サイトのカスタマーサポートエージェントです。
-顧客の問い合わせに丁寧に対応し、問題解決を支援します。
-過去の会話の文脈を理解した上で回答してください。""",
-    conversation_manager=conversation_manager,
-)
-
-
 # =============================================================================
-# 長い会話のシミュレーション
+# パート 1: SlidingWindowConversationManager（切り捨て動作のデモ）
 # =============================================================================
 
-def simulate_long_conversation():
-    """20回以上のやり取りをシミュレートして要約の動作を確認"""
+def demo_sliding_window():
+    """SlidingWindow で古いメッセージが切り捨てられる様子を確認"""
 
     print("=" * 70)
-    print(" SummarizingConversationManager: 長い会話の自動要約")
+    print(" パート1: SlidingWindowConversationManager（メッセージ切り捨て）")
     print("=" * 70)
-    print(f"""
-  設定（デモ用 - 要約発動を確認しやすい設定）:
-    summary_ratio: 0.5（50% を要約）
-    preserve_recent_messages: 4（直近4件を保持）
-    proactive_compression: 5%（コンテキスト使用率 5% で要約発動）
+    print("""
+  設定:
+    window_size: 4（最大 4 ペアのメッセージを保持）
 
-  ※ 本番環境での推奨設定は steps.md パート3 を参照
-
-  シナリオ: 顧客が複数の問題を段階的に報告する長い会話
+  → 5ターン目以降、古いメッセージが消える = 情報が完全に失われる
     """)
 
-    # 長い会話をシミュレート
+    # window_size=4: 最大 4 つの user/assistant ペアを保持
+    sliding_manager = SlidingWindowConversationManager(window_size=4)
+
+    agent = Agent(
+        model="us.amazon.nova-pro-v1:0",
+        system_prompt="""あなたは EC サイトのカスタマーサポートエージェントです。
+顧客の問い合わせに丁寧に対応し、問題解決を支援します。
+過去の会話の文脈を理解した上で回答してください。""",
+        conversation_manager=sliding_manager,
+    )
+
+    # 会話シナリオ: 重要な情報を最初に伝え、後半で参照する
     conversation_turns = [
-        # 初期の問い合わせ
-        "こんにちは。注文番号 ORD-2026-78901 について問い合わせたいのですが。",
-        "この注文、3日前に届いたんですが、商品が破損していました。",
-        "液晶モニターなんですが、画面の右下に大きなひびが入っています。",
-        "開封時に撮影した写真があります。交換か返金をお願いしたいです。",
-        # 追加情報
-        "配送業者はヤマト運輸でした。梱包は問題なさそうでした。",
-        "購入日は8月10日で、到着が8月12日です。",
-        "支払いはクレジットカードです。",
-        # 別の問題の追加
-        "あと、もう一つ聞きたいことがあるんですが...",
-        "先月のサブスクリプション更新で、プランが変わっていたみたいなんです。",
-        "月額2,980円のプランだったのに、4,980円のプランに変更されています。",
-        "変更した覚えはないのですが、確認していただけますか？",
-        # さらに詳細
-        "サブスクリプションID は SUB-456789 です。",
-        "先月のメールを確認しましたが、プラン変更の通知は来ていません。",
-        "2つの問題を整理すると、破損モニターの交換と、サブスク料金の訂正です。",
-        # フォローアップ
-        "モニターの交換品はいつ届きますか？",
-        "交換品が届くまでの間、一時的に代替品を借りることはできますか？",
-        "サブスクリプションの方は、差額を返金してもらえますか？",
-        "あと、今後こういった誤変更が起きないように対策はありますか？",
-        # 最終確認
-        "ありがとうございます。最後に確認させてください。",
-        "対応いただく内容を箇条書きでまとめていただけますか？",
+        "こんにちは。注文番号 ORD-2026-78901 について問い合わせたいです。",
+        "届いた液晶モニターが破損していました。画面右下にひびがあります。",
+        "配送業者はヤマト運輸で、購入日は8月10日です。",
+        "支払いはクレジットカードで、交換を希望します。",
+        "あと、サブスクリプション SUB-456789 の料金も確認してください。",
+        "月額2,980円のはずが4,980円になっています。",
+        # ここで初期の情報が切り捨てられているはず
+        "先ほどの注文番号は何でしたっけ？最初にお伝えした情報をまとめてください。",
     ]
 
     print(f"  会話ターン数: {len(conversation_turns)}")
-    print(f"\n{'─' * 70}")
+    print(f"{'─' * 70}")
 
     for i, user_message in enumerate(conversation_turns, 1):
-        print(f"\n  [ターン {i}/{len(conversation_turns)}] ユーザー: {user_message[:60]}...")
+        print(f"\n  [ターン {i}] ユーザー: {user_message}")
 
-        # エージェントに送信
         response = agent(user_message)
-
-        # 応答を表示（短縮）
         response_text = str(response)
-        print(f"  エージェント: {response_text[:150]}...")
 
-        # コンテキストサイズの追跡（メッセージ数で代用）
         msg_count = len(agent.messages)
-        print(f"  [コンテキスト] メッセージ数: {msg_count}")
+        print(f"  エージェント: {response_text[:200]}...")
+        print(f"  [メッセージ数: {msg_count}]", end="")
 
-        # 要約が発生したかチェック
-        if msg_count < i * 2:  # 通常は user+assistant で2つずつ増える
-            print(f"  ⚡ 要約が発生した可能性あり（メッセージ数が期待値より少ない）")
+        if msg_count < i * 2:
+            print(f" ← 切り捨て発生！（期待: {i*2}, 実際: {msg_count}）")
+        else:
+            print()
 
-    # 最終状態の確認
     print(f"\n{'─' * 70}")
-    print(f"  [最終状態]")
-    print(f"  会話ターン数: {len(conversation_turns)}")
-    print(f"  最終メッセージ数: {len(agent.messages)}")
-    print(f"  要約により削減されたメッセージ: {len(conversation_turns) * 2 - len(agent.messages)}")
-
-    # コンテキスト内容の確認
-    print(f"\n  [コンテキスト内の要約メッセージ]")
-    for msg in agent.messages[:3]:  # 最初の数メッセージを確認
-        if msg.get("role") == "assistant":
-            content = msg.get("content", [{}])
-            if content and isinstance(content, list):
-                text = content[0].get("text", "")
-                if "要約" in text or "Summary" in text.lower():
-                    print(f"  要約: {text[:200]}...")
-                    break
+    print(f"  [結果] 最終メッセージ数: {len(agent.messages)}（window_size=4 → 最大8メッセージ）")
+    print(f"  → 注文番号 ORD-2026-78901 の情報は切り捨てられ、回答できない可能性が高い")
 
 
 # =============================================================================
-# 3種類のマネージャーの比較
+# パート 2: SummarizingConversationManager（要約による保持）
+# =============================================================================
+
+def demo_summarizing():
+    """SummarizingConversationManager の設定と本番での動作を説明"""
+
+    print(f"\n\n{'=' * 70}")
+    print(" パート2: SummarizingConversationManager（要約で情報保持）")
+    print("=" * 70)
+    print("""
+  SummarizingConversationManager は SlidingWindow と異なり、
+  古いメッセージを単純に削除するのではなく「要約」して保持します。
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ 動作の違い                                                        │
+  ├──────────────────────────────────────────────────────────────────┤
+  │                                                                    │
+  │  SlidingWindow:                                                    │
+  │    [msg1][msg2][msg3][msg4][msg5][msg6] → [msg5][msg6]            │
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                   │
+  │     完全に削除（情報喪失）                                         │
+  │                                                                    │
+  │  Summarizing:                                                      │
+  │    [msg1][msg2][msg3][msg4][msg5][msg6]                            │
+  │     → [要約: msg1-4の重要情報][msg5][msg6]                        │
+  │        ^^^^^^^^^^^^^^^^^^^^^^^^                                    │
+  │        注文番号、顧客名、決定事項を保持                            │
+  │                                                                    │
+  └──────────────────────────────────────────────────────────────────┘
+
+  要約のトリガー条件:
+    - ContextWindowOverflowError が発生した時（リアクティブ）
+    - モデルのコンテキストウィンドウが実際に飽和した時に初めて発動
+    - Nova Pro (300K tokens) の場合、数百ターンの会話で発動
+    """)
+
+    # 同じ会話を SummarizingConversationManager で実行
+    summarizing_manager = SummarizingConversationManager(
+        summary_ratio=0.5,
+        preserve_recent_messages=4,
+    )
+
+    agent = Agent(
+        model="us.amazon.nova-pro-v1:0",
+        system_prompt="""あなたは EC サイトのカスタマーサポートエージェントです。
+顧客の問い合わせに丁寧に対応し、問題解決を支援します。
+過去の会話の文脈を理解した上で回答してください。""",
+        conversation_manager=summarizing_manager,
+    )
+
+    # 同じシナリオ
+    conversation_turns = [
+        "こんにちは。注文番号 ORD-2026-78901 について問い合わせたいです。",
+        "届いた液晶モニターが破損していました。画面右下にひびがあります。",
+        "配送業者はヤマト運輸で、購入日は8月10日です。",
+        "支払いはクレジットカードで、交換を希望します。",
+        "あと、サブスクリプション SUB-456789 の料金も確認してください。",
+        "月額2,980円のはずが4,980円になっています。",
+        "先ほどの注文番号は何でしたっけ？最初にお伝えした情報をまとめてください。",
+    ]
+
+    print(f"  会話ターン数: {len(conversation_turns)}")
+    print(f"{'─' * 70}")
+
+    for i, user_message in enumerate(conversation_turns, 1):
+        print(f"\n  [ターン {i}] ユーザー: {user_message}")
+
+        response = agent(user_message)
+        response_text = str(response)
+
+        msg_count = len(agent.messages)
+        print(f"  エージェント: {response_text[:200]}...")
+        print(f"  [メッセージ数: {msg_count}]")
+
+    print(f"\n{'─' * 70}")
+    print(f"  [結果] 最終メッセージ数: {len(agent.messages)}")
+    print(f"  → コンテキストウィンドウに余裕があるため全メッセージ保持")
+    print(f"  → 注文番号 ORD-2026-78901 の情報を正しく回答できる")
+    print(f"""
+  [比較まとめ]
+  ┌───────────────────┬─────────────────────┬──────────────────────────┐
+  │                   │ SlidingWindow       │ Summarizing              │
+  ├───────────────────┼─────────────────────┼──────────────────────────┤
+  │ 7ターン目の回答   │ ❌ 情報喪失の可能性  │ ✅ 全情報を保持          │
+  │ メッセージ数      │ 8（固定上限）        │ {len(agent.messages)}（全保持 or 要約）     │
+  │ 情報の扱い        │ 古いものを削除       │ 要約して圧縮保持         │
+  │ 適用場面          │ 短い会話/簡易用途    │ 本番環境推奨             │
+  └───────────────────┴─────────────────────┴──────────────────────────┘
+    """)
+
+
+# =============================================================================
+# 3種類のマネージャーの比較（参考情報）
 # =============================================================================
 
 def compare_managers():
     """3種類の会話マネージャーの特徴を比較"""
 
-    print(f"\n{'─' * 70}")
-    print("  [参考] 3種類の会話マネージャー比較")
+    print(f"{'─' * 70}")
+    print("  [参考] 3種類の会話マネージャー")
     print(f"{'─' * 70}")
     print("""
     ┌─────────────────────────────────────────────────────────────────┐
@@ -160,5 +204,6 @@ def compare_managers():
 
 
 if __name__ == "__main__":
-    simulate_long_conversation()
+    demo_sliding_window()
+    demo_summarizing()
     compare_managers()
