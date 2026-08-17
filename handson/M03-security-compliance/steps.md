@@ -1,6 +1,6 @@
 # モジュール 3: セキュリティとコンプライアンスの実装 - ハンズオン手順
 
-## パート 1: AgentCore Identity - 認証と認可（10分）
+## パート 1: AgentCore Identity - 認証と認可（15分）
 
 ### ステップ 1.1: プロジェクトの準備
 
@@ -8,20 +8,59 @@
 cd ~/handson/M03-security-compliance
 ```
 
-### ステップ 1.2: AgentCore Identity の概要確認
+### ステップ 1.2: AgentCore Identity デモの実行
+
+このデモでは実際に以下のリソースを作成し、AgentCore Identity の認証フローを体験します:
+
+1. **Amazon Cognito User Pool** — OAuth 2.0 認可サーバーとして機能
+2. **AgentCore OAuth2 Credential Provider** — エージェントの認証情報を管理
+3. **Callback URL の登録** — OAuth フローを完結させる
 
 ```bash
 python agentcore_identity_demo.py
 ```
 
-出力を確認し、以下のアーキテクチャを理解します：
+### ステップ 1.3: 出力の確認ポイント
 
-- **インバウンド認証**: ユーザー → AgentCore Runtime（IAM or OAuth）
+デモ実行中に以下を確認します:
+
+**Step 1: Cognito User Pool 作成**
+- User Pool ID、App Client ID、テストユーザーが作成される
+- Issuer URL（OpenID Connect Discovery エンドポイント）が生成される
+- Hosted UI URL で OAuth ログイン画面が利用可能になる
+
+**Step 2: AgentCore Credential Provider 作成**
+- `create_oauth2_credential_provider` API で Provider を登録
+- Status が `READY` になることを確認
+- AgentCore が **Callback URL** を発行する（Token Vault へのトークン受け取り先）
+
+**Step 3: Callback URL の登録**
+- AgentCore が発行した Callback URL を Cognito App Client に登録
+- これにより OAuth 2.0 Authorization Code Flow が完成
+
+**Step 4: リソースの確認**
+- `get_oauth2_credential_provider` でプロバイダーの詳細を取得
+- `list_oauth2_credential_providers` で一覧を確認
+
+**Step 5: クリーンアップ**
+- 作成した全リソース（Credential Provider → Cognito ドメイン → User Pool）を削除
+
+### ステップ 1.4: AgentCore Identity アーキテクチャの理解
+
+デモ終了後に表示されるアーキテクチャ図を元に議論します:
+
+**認証フローの方向:**
+- **インバウンド認証**: ユーザー → AgentCore Runtime（IAM Sig V4 or OAuth Token）
 - **アウトバウンド認証**: AgentCore Runtime → ツール/リソース（IAM Role or OAuth Token）
-- **OAuth 2LO**: エージェント自身のリソースアクセス（M2M）
-- **OAuth 3LO**: ユーザーの代理で動作（ユーザー同意が必要）
 
-### ステップ 1.3: AgentCore Gateway の認証方式
+**OAuth フロー種別:**
+
+| フロー | 正式名称 | ユースケース |
+|--------|---------|-------------|
+| 2LO (2-Legged) | Client Credentials | エージェント自身のリソースアクセス（M2M） |
+| 3LO (3-Legged) | Authorization Code | ユーザーの代理で動作（今回のデモ） |
+
+**AgentCore Gateway のターゲット別認証:**
 
 | ターゲット種類 | 認証方式 | ユースケース |
 |-------------|---------|-------------|
