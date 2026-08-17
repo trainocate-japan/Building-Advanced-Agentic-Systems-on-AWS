@@ -568,6 +568,26 @@ def handler(event, context):
                     gateway_url = gw_detail.get("gatewayUrl", "N/A")
                     break
             print_success(f"Gateway 既存（スキップ）: {gateway_id}")
+            # allowedClients を現在のクライアントに更新
+            print_info("アクション", "Gateway authorizer を現在の Cognito に更新中...")
+            agentcore_client.update_gateway(
+                gatewayIdentifier=gateway_id,
+                name=GATEWAY_NAME,
+                protocolType="MCP",
+                authorizerType="CUSTOM_JWT",
+                authorizerConfiguration={
+                    "customJWTAuthorizer": {
+                        "discoveryUrl": discovery_url,
+                        "allowedClients": [client_id_2lo, client_id_3lo],
+                    }
+                },
+                roleArn=gateway_role_arn,
+                policyEngineConfiguration={
+                    "mode": "ENFORCE",
+                    "arn": policy_engine_arn,
+                },
+            )
+            print_success("Gateway authorizer 更新完了")
         else:
             raise
     print_info("Gateway ID", gateway_id)
