@@ -562,8 +562,10 @@ def handler(event, context):
             for gw in gateways.get("items", []):
                 if gw.get("name") == GATEWAY_NAME:
                     gateway_id = gw["gatewayId"]
-                    gateway_arn = gw.get("gatewayArn", f"arn:aws:bedrock-agentcore:{REGION}:{account_id}:gateway/{gateway_id}")
-                    gateway_url = gw.get("gatewayUrl", "N/A")
+                    # get_gateway で詳細を取得
+                    gw_detail = agentcore_client.get_gateway(gatewayIdentifier=gateway_id)
+                    gateway_arn = gw_detail.get("gatewayArn", f"arn:aws:bedrock-agentcore:{REGION}:{account_id}:gateway/{gateway_id}")
+                    gateway_url = gw_detail.get("gatewayUrl", "N/A")
                     break
             print_success(f"Gateway 既存（スキップ）: {gateway_id}")
         else:
