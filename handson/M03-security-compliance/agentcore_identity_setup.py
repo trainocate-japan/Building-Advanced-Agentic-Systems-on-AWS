@@ -573,11 +573,13 @@ def handler(event, context):
         name="handson-tools",
         description="ハンズオン用ツール（返金処理 + 注文確認）",
         targetConfiguration={
-            "lambda": {
-                "lambdaArn": lambda_arn,
-                "toolSchema": {
-                    "inlinePayload": tool_schema,
-                },
+            "mcp": {
+                "lambda": {
+                    "lambdaArn": lambda_arn,
+                    "toolSchema": {
+                        "inlinePayload": tool_schema,
+                    },
+                }
             }
         },
     )
