@@ -20,7 +20,7 @@ import time
 bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
 
 # プロンプトキャッシュ対応モデル
-MODEL_ID = "us.anthropic.claude-sonnet-4-6-20250725-v1:0"
+MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
 
 # =============================================================================
@@ -151,7 +151,7 @@ def demo_tool_caching():
 
     # cache_tools="default" でツール定義をキャッシュ
     bedrock_model = BedrockModel(
-        model_id="anthropic.claude-sonnet-4-5-20250929-v1:0",
+        model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
         cache_tools="default"  # ← ツールキャッシュ有効化
     )
 
