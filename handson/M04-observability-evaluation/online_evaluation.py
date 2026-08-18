@@ -185,15 +185,22 @@ def create_online_evaluation(role_arn, runtime=None, endpoint=None):
 
     config_name = "m04_handson_online_eval"
 
-    # 既存設定の確認
+    # 既存設定の確認と削除（ランタイム再作成に対応）
     try:
         existing = agentcore.list_online_evaluation_configs()
         for cfg in existing.get("onlineEvaluationConfigs", []):
             if cfg.get("onlineEvaluationConfigName") == config_name:
-                print(f"\n  ✅ 既存の評価設定を検出: {config_name}")
-                print(f"     ARN: {cfg['onlineEvaluationConfigArn']}")
+                print(f"\n  既存の評価設定を検出: {config_name}")
                 print(f"     Status: {cfg['status']}")
-                return cfg
+                print(f"  → 新しいランタイムに合わせて再作成します...")
+                try:
+                    agentcore.delete_online_evaluation_config(
+                        onlineEvaluationConfigId=cfg["onlineEvaluationConfigId"]
+                    )
+                    print(f"  ✅ 既存設定を削除しました")
+                    time.sleep(5)
+                except Exception as e:
+                    print(f"  ⚠️  削除スキップ: {e}")
     except Exception:
         pass
 
