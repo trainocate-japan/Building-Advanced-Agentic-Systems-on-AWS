@@ -8,22 +8,30 @@
 cd ~/handson/M03-security-compliance
 ```
 
-### ステップ 1.2: 前準備 — Cognito + AgentCore Identity セットアップ
+### ステップ 1.2: フルセットアップの実行
 
-以下のリソースを作成し、OAuth 2.0 認証基盤を構築します:
+以下のリソースを一括作成し、Identity（認証）と Policy（認可）のデモ基盤を構築します:
 
-- Cognito User Pool + ドメイン（認可サーバー）
-- Resource Server + カスタムスコープ（2LO 用）
-- App Client（`client_credentials` + `code` フロー対応）
-- テストユーザー（3LO の同意フロー用）
+**[Identity 基盤]**
+- Cognito User Pool + ドメイン + Resource Server（OAuth 2.0 認可サーバー）
+- App Client（2LO: `client_credentials` / 3LO: `code` フロー）
+- テストユーザー
 - AgentCore OAuth2 Credential Provider
-- Callback URL の登録
+
+**[Gateway + Policy 基盤]**
+- モック Lambda 関数（`process_refund` / `get_order_status`）
+- Gateway 用 IAM ロール
+- AgentCore Gateway（JWT Authorizer + Policy Engine 付き）
+- Gateway Target（Lambda）
+- Policy Engine + Cedar ポリシー
 
 ```bash
 python agentcore_identity_setup.py
 ```
 
-設定情報は `identity_config.json` に保存され、後続のデモで使用されます。
+> ⏳ Gateway や Policy Engine の作成に数分かかります。  
+> 設定情報は `identity_config.json` に保存され、後続のデモで使用されます。  
+> 2回目以降の実行では既存リソースがスキップされます（冪等）。
 
 ### ステップ 1.3: 2LO (Client Credentials) デモ
 
@@ -48,11 +56,23 @@ python agentcore_identity_3lo.py
 
 確認ポイント:
 - 認可 URL が生成される（本番: ユーザーが Hosted UI でログイン＆同意）
+- `y` を入力してユーザー同意をシミュレート
 - ID Token にユーザー情報（email、username）が含まれる
 - Access Token で「誰の代理で動作しているか」が明確になる
-- AgentCore の Token Vault がトークンのライフサイクルを管理
 
-### ステップ 1.5: 2LO vs 3LO 比較
+### ステップ 1.5: Gateway 認証デモ
+
+Strands Agent が Gateway に MCP 接続し、JWT 認証の通過/拒否を確認します。
+
+```bash
+python agentcore_gateway_demo.py
+```
+
+確認ポイント:
+- **有効なトークン** → Gateway 認証通過 → Lambda 実行 → 応答返却
+- **無効なトークン** → JWT Authorizer で即座に 403 ブロック
+
+### ステップ 1.6: 2LO vs 3LO 比較
 
 | 観点 | 2LO (Client Credentials) | 3LO (Authorization Code) |
 |------|-------------------------|--------------------------|
@@ -62,17 +82,17 @@ python agentcore_identity_3lo.py
 | スコープ | カスタムスコープのみ | openid/profile/email |
 | ユースケース | M2M、バッチ処理 | ユーザー代理動作 |
 
-### ステップ 1.6: AgentCore Identity アーキテクチャの理解
+### ステップ 1.7: AgentCore Identity アーキテクチャの理解
 
 **認証フローの方向:**
-- **インバウンド認証**: ユーザー → AgentCore Runtime（IAM Sig V4 or OAuth Token）
-- **アウトバウンド認証**: AgentCore Runtime → ツール/リソース（IAM Role or OAuth Token）
+- **インバウンド認証**: ユーザー → AgentCore Gateway（JWT Token）
+- **アウトバウンド認証**: AgentCore Gateway → ツール/リソース（IAM Role）
 
 **AgentCore Gateway のターゲット別認証:**
 
 | ターゲット種類 | 認証方式 | ユースケース |
 |-------------|---------|-------------|
-| AWS Lambda | IAM | AWS 内部リソースへのアクセス |
+| AWS Lambda | IAM (Gateway Role) | AWS 内部リソースへのアクセス |
 | MCP サーバー | OAuth トークン | 外部 MCP ツールへのアクセス |
 | OpenAPI | IAM | REST API へのアクセス |
 | Smithy | IAM | AWS スタイルの API |
@@ -83,27 +103,58 @@ python agentcore_identity_3lo.py
 
 ### ステップ 2.1: Cedar ポリシーデモの実行
 
+Strands Agent が Gateway 経由でツールを呼び出し、Cedar ポリシーによるリアルタイム認可を体験します。
+
 ```bash
 python agentcore_policy_demo.py
 ```
 
-出力を確認し、Cedar ポリシーの認可フローを理解します：
-1. JWT トークン受信 → 2. MCP ツールコールリクエスト → 3. Cedar 認可リクエスト → 4. ALLOW/DENY
+**テスト内容:**
+
+| テスト | ツール | 入力 | 期待結果 | 理由 |
+|--------|--------|------|----------|------|
+| 1 | get_order_status | order_id="ORD-12345" | ✅ ALLOW | 全ユーザーに許可 |
+| 2 | process_refund | amount=100 | ✅ ALLOW | 100 < 500 |
+| 3 | process_refund | amount=1000 | 🚫 DENY | 1000 >= 500 |
+
+確認ポイント:
+- テスト 1, 2: エージェントがツールを実行し、Lambda の結果が返る
+- テスト 3: `Tool Execution Denied: Tool call not allowed due to policy enforcement` が返る
+- Cedar ポリシーが `context.input.amount` の値でリアルタイムに判断している
 
 ### ステップ 2.2: Cedar ポリシーの構文理解
 
+セットアップで作成された実際のポリシー:
+
 ```cedar
-// 500ドル未満の返金のみ許可（財務部門ユーザー限定）
-permit (
+// Policy 1: 注文ステータス確認は全ユーザーに許可
+permit(
     principal,
-    action == MCP::Action::"process_refund",
-    resource
-)
-when {
-    principal.department == "finance" &&
-    resource.amount < 500
+    action == AgentCore::Action::"handson-tools___get_order_status",
+    resource == AgentCore::Gateway::"<gateway-arn>"
+);
+
+// Policy 2: 返金は 500 USD 未満のみ許可
+permit(
+    principal,
+    action == AgentCore::Action::"handson-tools___process_refund",
+    resource == AgentCore::Gateway::"<gateway-arn>"
+) when {
+    context.input.amount < 500
 };
 ```
+
+**Cedar ポリシーの構成要素:**
+
+| 要素 | 説明 | 今回の例 |
+|------|------|---------|
+| 効果 | `permit` or `forbid` | `permit` |
+| principal | 誰が（JWT の sub クレーム） | 全ユーザー（制約なし） |
+| action | 何を（ツール名） | `handson-tools___process_refund` |
+| resource | どこに対して（Gateway ARN） | このGateway |
+| when | 条件 | `context.input.amount < 500` |
+
+**重要**: ENFORCE モードでは、**明示的に permit されていないアクションは全て deny** されます（deny by default）。
 
 ---
 
