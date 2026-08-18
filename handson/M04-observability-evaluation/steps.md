@@ -236,6 +236,99 @@ echo "アップロード完了: s3://$BUCKET/evaluation/evaluation-dataset.jsonl
 
 ---
 
+## パート 3.5: AgentCore オンライン評価（Runtime エンドポイント対象）（10分）
+
+### ステップ 3.5.1: オンライン評価の概要
+
+AgentCore Evaluations の「オンライン評価」は、AgentCore Runtime エンドポイントのライブトラフィックを自動サンプリングし、組み込みエバリュエーターで継続的に品質を評価する仕組みです。
+
+| 項目 | 内容 |
+|------|------|
+| データソース | AgentCore Runtime のトレース（CloudWatch Logs） |
+| 実行方式 | 継続的・自動（設定後は人手不要） |
+| サンプリング | 0.01% - 100% で設定可能 |
+| セッション検出 | アイドルタイムアウト（1-60分）で自動判定 |
+| 結果出力 | CloudWatch メトリクス（Embedded Metric Format） |
+| アラーム連携 | CloudWatch Alarms と直接統合可能 |
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  AgentCore      │────▶│  CloudWatch Logs  │────▶│  Online         │
+│  Runtime        │     │  (トレーススパン) │     │  Evaluation     │
+│  Endpoint       │     │                    │     │  (自動サンプル) │
+└─────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                           │
+                                                           ▼
+                                                  ┌─────────────────┐
+                                                  │  CloudWatch     │
+                                                  │  Metrics/Alarms │
+                                                  └─────────────────┘
+```
+
+### ステップ 3.5.2: オンライン評価のセットアップ
+
+以下のスクリプトを実行すると、IAM ロールの作成とオンライン評価設定が一括で行われます：
+
+```bash
+python online_evaluation.py
+```
+
+このスクリプトは以下を実行します：
+1. AgentCore Runtime にデプロイ済みのエージェントを検出（なければ ADOT デモのロググループを使用）
+2. 評価実行用の IAM ロールを作成（`AgentCoreOnlineEvaluationRole`）
+3. オンライン評価設定を作成（サンプリング率 100%、セッションタイムアウト 5 分）
+4. 結果確認方法のガイダンスを表示
+
+### ステップ 3.5.3: 使用するエバリュエーター
+
+スクリプトでは以下の 4 つの組み込みエバリュエーターを設定しています：
+
+| エバリュエーター | 説明 |
+|----------------|------|
+| Builtin.Helpfulness | 回答がユーザーにとってどれだけ有用か |
+| Builtin.Correctness | 回答が事実に基づいて正確か |
+| Builtin.GoalSuccessRate | ユーザーの目標が達成されたか（エンドツーエンド） |
+| Builtin.ToolSelectionAccuracy | エージェントが適切なツールを選択したか |
+
+> ℹ️ 組み込みエバリュエーターは最大 10 個まで設定可能です。カスタムエバリュエーター（Lambda 関数）も混在できます。
+
+### ステップ 3.5.4: 評価をトリガーする
+
+オンライン評価は設定後に自動実行されますが、評価対象のトレースが必要です。パート 1 の ADOT デモを再実行して評価をトリガーします：
+
+```bash
+bash run_otel_tracing.sh
+```
+
+評価結果が表示されるまで 5-10 分かかります。
+
+### ステップ 3.5.5: 評価結果の確認（コンソール）
+
+1. AWS コンソールで **CloudWatch** を開く
+2. **GenAI Observability** → **Bedrock AgentCore** を選択
+3. **Evaluations** タブを確認
+4. セッション毎のスコア（Helpfulness, Correctness 等）を確認
+
+### ステップ 3.5.6: 本番環境での推奨設定
+
+| パラメータ | デモ設定 | 本番推奨 | 理由 |
+|-----------|---------|---------|------|
+| samplingPercentage | 100% | 1-10% | コスト最適化 |
+| sessionTimeoutMinutes | 5 | 15 | セッション完了を正確に検出 |
+| enableOnCreate | True | True | 即座に監視開始 |
+| evaluators | 4 個 | 5-8 個 | カスタム評価も追加 |
+
+**アラーム連携の例（品質劣化の自動検出）:**
+
+```
+メトリクス: Bedrock-AgentCore/Evaluations
+  → EvaluatorName = "Builtin.Helpfulness"
+  → avg(score) < 3.5 が 3 データポイント連続
+  → SNS → Slack / PagerDuty 通知
+```
+
+---
+
 ## パート 4: エージェント評価スクリプトの実行（5分）
 
 ### ステップ 4.1: カスタムエバリュエーターの実行
