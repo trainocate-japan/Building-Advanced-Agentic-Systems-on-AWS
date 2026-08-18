@@ -357,6 +357,7 @@ def demo_document_caching():
 
     print(f"\n  結果:")
     print(f"    入力トークン: {usage['inputTokens']}")
+    print(f"    キャッシュ読み取り: {usage.get('cacheReadInputTokens', 0)}")
     print(f"    キャッシュ書き込み: {usage.get('cacheWriteInputTokens', 0)}")
     print(f"    レイテンシー: {round(elapsed * 1000)}ms")
     print(f"    回答: {response['output']['message']['content'][0]['text'][:200]}...")
