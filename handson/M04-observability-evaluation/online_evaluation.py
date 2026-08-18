@@ -141,9 +141,13 @@ def create_evaluation_role():
                     "logs:DescribeLogStreams",
                     "logs:CreateLogGroup",
                     "logs:CreateLogStream",
-                    "logs:PutLogEvents"
+                    "logs:PutLogEvents",
+                    "logs:GetLogRecord",
+                    "logs:StartQuery",
+                    "logs:StopQuery",
+                    "logs:GetQueryResults"
                 ],
-                "Resource": f"arn:aws:logs:{REGION}:{account_id}:log-group:/aws/bedrock-agentcore/*"
+                "Resource": f"arn:aws:logs:{REGION}:{account_id}:log-group:*"
             },
             {
                 "Effect": "Allow",
