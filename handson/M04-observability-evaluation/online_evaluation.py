@@ -216,11 +216,18 @@ def create_online_evaluation(role_arn, runtime=None, endpoint=None):
 
     # ロググループの存在確認
     try:
-        logs.describe_log_groups(logGroupNamePrefix=log_group)
+        resp = logs.describe_log_groups(logGroupNamePrefix=log_group)
+        existing = [lg for lg in resp.get("logGroups", []) if lg["logGroupName"] == log_group]
+        if existing:
+            print(f"    ✅ ロググループ存在確認済み")
+        else:
+            logs.create_log_group(logGroupName=log_group)
+            print(f"    ✅ ロググループ作成済み: {log_group}")
+    except logs.exceptions.ResourceAlreadyExistsException:
         print(f"    ✅ ロググループ存在確認済み")
-    except Exception:
+    except Exception as e:
         logs.create_log_group(logGroupName=log_group)
-        print(f"    ✅ ロググループ作成済み")
+        print(f"    ✅ ロググループ作成済み: {log_group}")
 
     # エバリュエーターの選択
     evaluators = [
