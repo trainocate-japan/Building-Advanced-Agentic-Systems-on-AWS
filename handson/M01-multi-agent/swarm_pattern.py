@@ -72,9 +72,15 @@ def run_swarm_pattern():
     print(" Swarm パターン: 自律的エージェントコラボレーション")
     print("=" * 60)
 
-    # Swarm の構成
+    # Swarm の構成（無限ループ防止パラメータ付き）
     swarm = Swarm(
         nodes=[research_analyst, strategy_consultant, implementation_engineer],
+        max_handoffs=10,                          # ハンドオフ回数の上限（デフォルト: 20）
+        max_iterations=10,                        # ノード実行回数の上限（デフォルト: 20）
+        execution_timeout=300.0,                  # 全体のタイムアウト秒数（デフォルト: 900）
+        node_timeout=60.0,                        # 個別ノードのタイムアウト秒数（デフォルト: 300）
+        repetitive_handoff_detection_window=4,    # 直近 N 回のハンドオフ履歴を監視
+        repetitive_handoff_min_unique_agents=2,   # ウィンドウ内に最低 N 種のエージェントが必要
     )
 
     # テストシナリオ
