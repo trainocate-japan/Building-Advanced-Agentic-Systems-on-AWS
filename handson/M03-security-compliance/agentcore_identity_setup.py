@@ -677,7 +677,7 @@ def handler(event, context):
                 "type": "object",
                 "properties": {
                     "order_id": {"type": "string", "description": "注文ID"},
-                    "amount": {"type": "number", "description": "返金額（USD）"},
+                    "amount": {"type": "integer", "description": "返金額（USD）"},
                     "reason": {"type": "string", "description": "返金理由"},
                 },
                 "required": ["order_id", "amount"],
@@ -773,7 +773,7 @@ def handler(event, context):
             description="注文ステータス確認は全ユーザーに許可",
             policyEngineId=policy_engine_id,
             definition={"cedar": {"statement": cedar_allow_read}},
-            enforcementMode="ACTIVE",
+            validationMode="IGNORE_ALL_FINDINGS",
         )
         print_success(f"Policy 'allow_order_status' 作成: {resp1.get('policyId', 'N/A')}")
     except Exception as e:
@@ -789,7 +789,7 @@ def handler(event, context):
             description="返金は500USD未満のみ許可",
             policyEngineId=policy_engine_id,
             definition={"cedar": {"statement": cedar_refund_limit}},
-            enforcementMode="ACTIVE",
+            validationMode="IGNORE_ALL_FINDINGS",
         )
         print_success(f"Policy 'limit_refund_amount' 作成: {resp2.get('policyId', 'N/A')}")
     except Exception as e:
