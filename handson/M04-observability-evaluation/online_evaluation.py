@@ -45,7 +45,7 @@ def discover_agent_runtime():
 
         print(f"\n  検出されたエージェント: {len(runtimes)} 件")
         for rt in runtimes:
-            print(f"    - {rt['name']} (ID: {rt['agentRuntimeId']}, Status: {rt['status']})")
+            print(f"    - {rt['agentRuntimeName']} (ID: {rt['agentRuntimeId']}, Status: {rt['status']})")
 
         # 最初の READY なランタイムを使用
         ready_runtimes = [r for r in runtimes if r.get("status") == "READY"]
@@ -55,7 +55,8 @@ def discover_agent_runtime():
 
         runtime = ready_runtimes[0]
         runtime_id = runtime["agentRuntimeId"]
-        print(f"\n  ✅ 使用するランタイム: {runtime['name']} ({runtime_id})")
+        runtime_name = runtime["agentRuntimeName"]
+        print(f"\n  ✅ 使用するランタイム: {runtime_name} ({runtime_id})")
 
         # エンドポイントを取得
         ep_response = agentcore.list_agent_runtime_endpoints(agentRuntimeId=runtime_id)
@@ -64,6 +65,8 @@ def discover_agent_runtime():
         if endpoints:
             endpoint = endpoints[0]
             print(f"  ✅ エンドポイント: {endpoint['name']} (Status: {endpoint['status']})")
+            # runtime dict に name を統一的に設定
+            runtime["_name"] = runtime_name
             return runtime, endpoint
 
         return runtime, None
@@ -120,7 +123,7 @@ def create_evaluation_role():
     response = iam.create_role(
         RoleName=role_name,
         AssumeRolePolicyDocument=json.dumps(trust_policy),
-        Description="AgentCore オンライン評価の実行ロール",
+        Description="IAM role for AgentCore online evaluation execution",
         Tags=[{"Key": "Project", "Value": "M04-Handson"}]
     )
     role_arn = response["Role"]["Arn"]
@@ -195,8 +198,9 @@ def create_online_evaluation(role_arn, runtime=None, endpoint=None):
         # AgentCore Runtime のログ形式
         agent_id = runtime["agentRuntimeId"]
         endpoint_name = endpoint["name"]
+        runtime_name = runtime.get("_name", runtime.get("agentRuntimeName", "agent"))
         log_group = f"/aws/bedrock-agentcore/runtimes/{agent_id}-{endpoint_name}"
-        service_name = f"{runtime['name']}.{endpoint_name}"
+        service_name = f"{runtime_name}.{endpoint_name}"
     else:
         # ADOT デモで使用したロググループをフォールバック
         log_group = "/aws/bedrock-agentcore/runtimes/handson-demo-agent"
