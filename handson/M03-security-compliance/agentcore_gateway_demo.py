@@ -18,7 +18,32 @@ import urllib.request
 import urllib.parse
 from strands import Agent
 from strands.tools.mcp import MCPClient
-from mcp.client.streamable_http import streamablehttp_client
+
+# -----------------------------------------------------------------------------
+# MCP streamable HTTP クライアントの互換ラッパー
+#
+# mcp のバージョンによって API が異なるため吸収する:
+#   - mcp 1.x: streamablehttp_client(url=..., headers={...})
+#   - mcp 2.x: streamable_http_client(url, http_client=<httpx2.AsyncClient>)
+#             （headers は http_client 側に設定する。create_mcp_http_client で生成）
+# -----------------------------------------------------------------------------
+try:
+    # mcp 1.x
+    from mcp.client.streamable_http import streamablehttp_client as _sh_client
+
+    def make_streamable_client(url, headers):
+        return _sh_client(url=url, headers=headers)
+
+except ImportError:
+    # mcp 2.x
+    from mcp.client.streamable_http import (
+        streamable_http_client as _sh_client,
+        create_mcp_http_client as _create_http_client,
+    )
+
+    def make_streamable_client(url, headers):
+        http_client = _create_http_client(headers=headers)
+        return _sh_client(url, http_client=http_client)
 
 # =============================================================================
 # 設定
@@ -94,9 +119,9 @@ def main():
 
     try:
         mcp_client = MCPClient(
-            lambda: streamablehttp_client(
-                url=gateway_url,
-                headers={"Authorization": f"Bearer {token}"},
+            lambda: make_streamable_client(
+                gateway_url,
+                {"Authorization": f"Bearer {token}"},
             )
         )
 
@@ -135,9 +160,9 @@ def main():
 
     try:
         mcp_client_fake = MCPClient(
-            lambda: streamablehttp_client(
-                url=gateway_url,
-                headers={"Authorization": f"Bearer {fake_token}"},
+            lambda: make_streamable_client(
+                gateway_url,
+                {"Authorization": f"Bearer {fake_token}"},
             )
         )
 
