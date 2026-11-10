@@ -199,6 +199,10 @@ Resources:
           dnf update -y
           dnf install -y python3.12 python3.12-pip jq unzip tar git
 
+          # ssm-user は SSM の初回セッション接続時に作られるため、UserData 実行時点では
+          # 存在しない。先に作成しないと後続の chown が失敗し、資材が root 所有のままになる
+          id ssm-user >/dev/null 2>&1 || useradd -m -s /bin/bash ssm-user
+
           # Python venv 作成
           echo "[2/5] Python venv セットアップ..."
           VENV_DIR=/home/ssm-user/.venv
@@ -232,7 +236,7 @@ Resources:
           mkdir -p /home/ssm-user
           mkdir -p $WORK_DIR
           aws s3 cp s3://${AssetsBucket}/${AssetsPrefix}/handson.tar.gz /tmp/handson.tar.gz
-          tar -xzf /tmp/handson.tar.gz -C $WORK_DIR --strip-components=1
+          tar -xzf /tmp/handson.tar.gz -C $WORK_DIR --strip-components=1 --no-same-owner
           rm -f /tmp/handson.tar.gz
           chown -R ssm-user:ssm-user /home/ssm-user
           chmod -R 755 /home/ssm-user/handson

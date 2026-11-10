@@ -91,7 +91,7 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 aws s3 cp s3://handson-agentic-assets-$ACCOUNT_ID/handson-assets/handson.tar.gz /tmp/
 rm -rf ~/handson
 mkdir ~/handson
-tar -xzf /tmp/handson.tar.gz -C ~/handson --strip-components=1
+tar -xzf /tmp/handson.tar.gz -C ~/handson --strip-components=1 --no-same-owner
 ```
 
 ## コスト見積もり

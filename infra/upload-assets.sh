@@ -52,10 +52,13 @@ echo "[2/3] ハンズオン資材をアーカイブ中..."
 ARCHIVE_PATH="/tmp/handson.tar.gz"
 
 # .pyc や __pycache__ を除外してアーカイブ
+# --owner/--group/--numeric-owner でローカルの uid/gid を埋め込まず正規化し、
+# EC2 展開後に所有権がずれて PermissionError になるのを防ぐ
 tar -czf "$ARCHIVE_PATH" \
     --exclude='__pycache__' \
     --exclude='*.pyc' \
     --exclude='.DS_Store' \
+    --owner=0 --group=0 --numeric-owner \
     -C "$REPO_ROOT" handson/
 
 ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | cut -f1)
@@ -137,7 +140,7 @@ COMMAND_ID=$(aws ssm send-command \
         'aws s3 cp s3://$BUCKET_NAME/$PREFIX/handson.tar.gz /tmp/handson.tar.gz',
         'rm -rf \$WORK_DIR',
         'mkdir -p \$WORK_DIR',
-        'tar -xzf /tmp/handson.tar.gz -C \$WORK_DIR --strip-components=1',
+        'tar -xzf /tmp/handson.tar.gz -C \$WORK_DIR --strip-components=1 --no-same-owner',
         'chown -R ssm-user:ssm-user \$WORK_DIR',
         'rm -f /tmp/handson.tar.gz',
         'echo Done: \$(date)'
